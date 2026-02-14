@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { FolderManager } from '@/src/components/FolderManager';
 
 export default function DashboardPage() {
   const { user, isAuthenticated, loading, logout } = useAuth();
@@ -43,7 +44,7 @@ export default function DashboardPage() {
 
         <div className="card">
           <h2 style={{ marginBottom: '20px' }}>Bem-vindo!</h2>
-          
+
           <div style={{ marginBottom: '20px' }}>
             <p><strong>ID:</strong> {user?.id}</p>
             <p><strong>Email:</strong> {user?.email}</p>
@@ -54,12 +55,13 @@ export default function DashboardPage() {
             <h3 style={{ marginBottom: '10px' }}>Próximos Passos</h3>
             <ul style={{ paddingLeft: '20px' }}>
               <li>Upload de arquivos</li>
-              <li>Gerenciamento de pastas</li>
               <li>Listagem de arquivos</li>
               <li>Download de arquivos</li>
             </ul>
           </div>
         </div>
+
+        <FolderManager />
       </div>
     </div>
   );
