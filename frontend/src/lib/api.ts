@@ -29,6 +29,32 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface Folder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFolderPayload {
+  name: string;
+  parentId?: string | null;
+}
+
+export interface FolderFile {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string | null;
+  createdAt: string;
+}
+
+export interface FolderWithDetails extends Folder {
+  children: Folder[];
+  files: FolderFile[];
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -42,9 +68,9 @@ class ApiClient {
   ): Promise<T> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (token) {
@@ -59,6 +85,10 @@ class ApiClient {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'An error occurred' }));
       throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
     }
 
     return response.json();
@@ -81,6 +111,37 @@ class ApiClient {
   async getMe(): Promise<{ user: User }> {
     return this.request<{ user: User }>('/api/auth/me', {
       method: 'GET',
+    });
+  }
+
+  async getFolders(parentId?: string | null): Promise<{ folders: Folder[] }> {
+    const params = new URLSearchParams();
+    if (parentId !== undefined && parentId !== null) {
+      params.set('parentId', parentId);
+    }
+    const query = params.toString();
+    return this.request<{ folders: Folder[] }>(
+      `/api/folders${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async createFolder(name: string, parentId?: string | null): Promise<{ folder: Folder }> {
+    return this.request<{ folder: Folder }>('/api/folders', {
+      method: 'POST',
+      body: JSON.stringify({ name, parentId: parentId ?? null }),
+    });
+  }
+
+  async getFolder(id: string): Promise<{ folder: FolderWithDetails }> {
+    return this.request<{ folder: FolderWithDetails }>(`/api/folders/${encodeURIComponent(id)}`, {
+      method: 'GET',
+    });
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    await this.request<void>(`/api/folders/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
     });
   }
 }
