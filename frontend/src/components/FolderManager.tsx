@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, type Folder, type FolderFile } from '@/src/lib/api';
 
 type BreadcrumbItem = { id: string | null; name: string };
 
-/** Formata bytes em KB/MB para exibição. */
+// Formata bytes em KB/MB para exibição
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Formata data ISO para exibição local. */
+// Formata data ISO para exibição local
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     day: '2-digit',
@@ -33,6 +33,10 @@ export function FolderManager() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadFoldersAndFiles = useCallback(async (parentId: string | null) => {
     setLoading(true);
@@ -116,19 +120,78 @@ export function FolderManager() {
     }
   };
 
+  // Envia um arquivo para a pasta atual e recarrega a lista
+  const handleUpload = async (file: File) => {
+    if (uploading) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await api.uploadFile(file, currentFolderId);
+      await loadFoldersAndFiles(currentFolderId);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Erro ao enviar arquivo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const chosen = e.target.files?.[0];
+    if (chosen) handleUpload(chosen);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
   const isRoot = breadcrumb.length <= 1;
 
   return (
     <div className="card" style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0 }}>Minhas pastas</h2>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => { setShowNewFolder(true); setCreateError(null); setNewFolderName(''); }}
-        >
-          Nova pasta
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileInputChange}
+            disabled={uploading}
+            style={{ display: 'none' }}
+            aria-hidden
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => { fileInputRef.current?.click(); setUploadError(null); }}
+            disabled={uploading}
+          >
+            {uploading ? 'Enviando...' : 'Enviar arquivo'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => { setShowNewFolder(true); setCreateError(null); setNewFolderName(''); }}
+          >
+            Nova pasta
+          </button>
+        </div>
       </div>
 
       {/* Breadcrumb: permite navegar clicando em qualquer nível */}
@@ -205,13 +268,28 @@ export function FolderManager() {
       )}
 
       {error && <p className="error-message">{error}</p>}
+      {uploadError && <p className="error-message">{uploadError}</p>}
 
       {loading ? (
         <p style={{ color: '#6c757d' }}>Carregando pastas e arquivos...</p>
       ) : (
-        <>
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          style={{
+            padding: isDragging ? '16px' : undefined,
+            border: isDragging ? '2px dashed #0070f3' : '2px dashed transparent',
+            borderRadius: '6px',
+            backgroundColor: isDragging ? 'rgba(0, 112, 243, 0.05)' : undefined,
+            transition: 'border-color 0.15s, background-color 0.15s',
+          }}
+        >
+          {isDragging && (
+            <p style={{ color: '#0070f3', margin: '0 0 12px', fontWeight: 500 }}>Solte o arquivo aqui</p>
+          )}
           {folders.length === 0 && files.length === 0 && !error ? (
-            <p style={{ color: '#6c757d' }}>Nenhuma pasta nem arquivo aqui. Crie uma pasta com &quot;Nova pasta&quot;.</p>
+            <p style={{ color: '#6c757d' }}>Nenhuma pasta nem arquivo aqui. Crie uma pasta com &quot;Nova pasta&quot; ou envie um arquivo.</p>
           ) : (
             <>
               {folders.length > 0 && (
@@ -286,7 +364,7 @@ export function FolderManager() {
               )}
             </>
           )}
-        </>
+        </div>
       )}
     </div>
   );
