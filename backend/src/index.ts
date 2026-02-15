@@ -3,8 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
+import { ensureUploadDir } from './lib/uploads';
 
 dotenv.config();
+
+ensureUploadDir();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
