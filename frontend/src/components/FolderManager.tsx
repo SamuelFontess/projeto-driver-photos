@@ -1,39 +1,62 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { api, type Folder } from '@/src/lib/api';
+import { api, type Folder, type FolderFile } from '@/src/lib/api';
 
 type BreadcrumbItem = { id: string | null; name: string };
+
+/** Formata bytes em KB/MB para exibição. */
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Formata data ISO para exibição local. */
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
 
 export function FolderManager() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: 'Raiz' }]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [files, setFiles] = useState<FolderFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const loadFolders = useCallback(async (parentId: string | null) => {
+  const loadFoldersAndFiles = useCallback(async (parentId: string | null) => {
     setLoading(true);
     setError(null);
     try {
       const parent = parentId === undefined ? undefined : parentId;
-      const { folders: list } = await api.getFolders(parent);
+      const [{ folders: list }, { files: fileList }] = await Promise.all([
+        api.getFolders(parent),
+        api.getFiles(parent),
+      ]);
       setFolders(list);
+      setFiles(fileList);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar pastas');
+      setError(err instanceof Error ? err.message : 'Erro ao carregar conteúdo');
       setFolders([]);
+      setFiles([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadFolders(currentFolderId);
-  }, [currentFolderId, loadFolders]);
+    loadFoldersAndFiles(currentFolderId);
+  }, [currentFolderId, loadFoldersAndFiles]);
 
   const handleEnterFolder = (folder: Folder) => {
     setCurrentFolderId(folder.id);
@@ -60,7 +83,7 @@ export function FolderManager() {
       await api.createFolder(name, currentFolderId);
       setNewFolderName('');
       setShowNewFolder(false);
-      await loadFolders(currentFolderId);
+      await loadFoldersAndFiles(currentFolderId);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Erro ao criar pasta');
     } finally {
@@ -73,6 +96,24 @@ export function FolderManager() {
     if (index < 0) return;
     setBreadcrumb(breadcrumb.slice(0, index + 1));
     setCurrentFolderId(item.id);
+  };
+
+  const handleDownload = async (file: FolderFile) => {
+    if (downloadingId === file.id) return;
+    setDownloadingId(file.id);
+    try {
+      const { blob, filename } = await api.downloadFile(file.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao baixar arquivo');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const isRoot = breadcrumb.length <= 1;
@@ -166,37 +207,86 @@ export function FolderManager() {
       {error && <p className="error-message">{error}</p>}
 
       {loading ? (
-        <p style={{ color: '#6c757d' }}>Carregando pastas...</p>
-      ) : folders.length === 0 && !error ? (
-        <p style={{ color: '#6c757d' }}>Nenhuma pasta aqui. Crie uma com &quot;Nova pasta&quot;.</p>
+        <p style={{ color: '#6c757d' }}>Carregando pastas e arquivos...</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {folders.map((folder) => (
-            <li
-              key={folder.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                border: '1px solid #eee',
-                borderRadius: '6px',
-                marginBottom: '8px',
-                backgroundColor: '#fff',
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>📁 {folder.name}</span>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => handleEnterFolder(folder)}
-                style={{ padding: '8px 16px', fontSize: '14px' }}
-              >
-                Entrar
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {folders.length === 0 && files.length === 0 && !error ? (
+            <p style={{ color: '#6c757d' }}>Nenhuma pasta nem arquivo aqui. Crie uma pasta com &quot;Nova pasta&quot;.</p>
+          ) : (
+            <>
+              {folders.length > 0 && (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, marginBottom: '16px' }}>
+                  {folders.map((folder) => (
+                    <li
+                      key={folder.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        border: '1px solid #eee',
+                        borderRadius: '6px',
+                        marginBottom: '8px',
+                        backgroundColor: '#fff',
+                      }}
+                    >
+                      <span style={{ fontWeight: 500 }}>📁 {folder.name}</span>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleEnterFolder(folder)}
+                        style={{ padding: '8px 16px', fontSize: '14px' }}
+                      >
+                        Entrar
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <h3 style={{ margin: '0 0 8px', fontSize: '1rem', fontWeight: 600 }}>Arquivos</h3>
+              {files.length === 0 ? (
+                <p style={{ color: '#6c757d', margin: 0 }}>Nenhum arquivo nesta pasta.</p>
+              ) : (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {files.map((file) => (
+                    <li
+                      key={file.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        border: '1px solid #eee',
+                        borderRadius: '6px',
+                        marginBottom: '8px',
+                        backgroundColor: '#fff',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span style={{ fontWeight: 500, flex: '1 1 auto', minWidth: 0 }} title={file.name}>
+                        📄 {file.name}
+                      </span>
+                      <span style={{ color: '#6c757d', fontSize: '14px', flexShrink: 0 }}>
+                        {formatSize(file.size)} · {formatDate(file.createdAt)}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleDownload(file)}
+                        disabled={downloadingId === file.id}
+                        style={{ padding: '8px 16px', fontSize: '14px', flexShrink: 0 }}
+                      >
+                        {downloadingId === file.id ? 'Baixando...' : 'Download'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );
