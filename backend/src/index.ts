@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
+import fileRoutes from './routes/fileRoutes';
 import { ensureUploadDir } from './lib/uploads';
 
 dotenv.config();
@@ -26,10 +27,19 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/folders', folderRoutes);
+app.use('/api/files', fileRoutes);
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+// Error handling middleware (multer/fileFilter errors → 400)
+app.use((err: Error & { code?: string }, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
+  if (err.message?.includes('File type not allowed')) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    res.status(400).json({ error: 'File too large (max 10 MB)' });
+    return;
+  }
   res.status(500).json({ error: 'Internal server error' });
 });
 

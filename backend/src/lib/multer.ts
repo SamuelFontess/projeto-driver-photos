@@ -3,18 +3,46 @@ import fs from 'fs';
 import multer from 'multer';
 import { Request } from 'express';
 import { randomUUID } from 'crypto';
-import { UPLOAD_DIR } from './uploads';
+import { PASTA_UPLOAD } from './uploads';
 
-// diskStorage grava arquivos em UPLOAD_DIR/{userId}/{uuid}-{nome} para evitar conflito e manter uma pasta por usuário
+const TIPOS_PERMITIDOS = new Set([
+  'application/pdf',
+  'application/json',
+  'application/zip',
+  'application/x-rar-compressed',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'text/plain',
+  'text/csv',
+  'text/html',
+]);
 
-const storage = multer.diskStorage({
+function fileFilter(
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+): void {
+  const mime = (file.mimetype || 'application/octet-stream').toLowerCase();
+  if (TIPOS_PERMITIDOS.has(mime)) {
+    cb(null, true);
+    return;
+  }
+  cb(new Error(`File type not allowed: ${file.mimetype}`));
+}
+
+// diskStorage grava em PASTA_UPLOAD/{userId}/{uuid}-{nome}
+
+const armazenamento_disco = multer.diskStorage({
   destination(req: Request, _file, cb) {
     const userId = req.user?.userId;
     if (!userId) {
       cb(new Error('User not authenticated'), '');
       return;
     }
-    const userDir = path.join(UPLOAD_DIR, userId);
+    const userDir = path.join(PASTA_UPLOAD, userId);
     if (!fs.existsSync(userDir)) {
       fs.mkdirSync(userDir, { recursive: true });
     }
@@ -27,9 +55,10 @@ const storage = multer.diskStorage({
   },
 });
 
-// Instância do Multer para upload de um único arquivo. Usar como middleware após authenticate. Limite: 10 MB por arquivo
+// Middleware de um arquivo; usar após authenticate. Limite 10 MB.
 
-export const upload = multer({
-  storage,
+export const singleFile = multer({
+  storage: armazenamento_disco,
   limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter,
 });

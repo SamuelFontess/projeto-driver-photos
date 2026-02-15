@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma';
-import { UPLOAD_DIR } from '../lib/uploads';
+import { PASTA_UPLOAD } from '../lib/uploads';
 
-const FILE_SELECT = {
+const CAMPOS_ARQUIVO = {
   id: true,
   name: true,
   size: true,
@@ -33,7 +33,7 @@ export async function list(req: Request, res: Response): Promise<void> {
         folderId: isRoot ? null : folderIdParam,
       },
       orderBy: { name: 'asc' },
-      select: FILE_SELECT,
+      select: CAMPOS_ARQUIVO,
     });
 
     res.json({ files });
@@ -87,7 +87,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
         userId,
         folderId,
       },
-      select: FILE_SELECT,
+      select: CAMPOS_ARQUIVO,
     });
 
     res.status(201).json({ file: created });
@@ -117,7 +117,7 @@ export async function download(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const absolutePath = path.join(UPLOAD_DIR, fileRecord.path);
+    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
     if (!fs.existsSync(absolutePath)) {
       console.error('File on disk missing:', absolutePath);
       res.status(404).json({ error: 'File not found' });
