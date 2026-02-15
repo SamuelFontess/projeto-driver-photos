@@ -20,7 +20,9 @@ export interface FolderFile {
   name: string;
   size: number;
   mimeType: string | null;
+  folderId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface FolderWithDetails extends Folder {
