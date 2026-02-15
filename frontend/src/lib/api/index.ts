@@ -1,0 +1,36 @@
+/** Entrada única da API: métodos planos e reexport dos tipos. */
+
+import * as auth from './auth';
+import * as folders from './folders';
+import * as files from './files';
+
+export type {
+  RegisterData,
+  LoginData,
+  AuthResponse,
+  User,
+} from './auth';
+
+export type {
+  Folder,
+  CreateFolderPayload,
+  FolderFile,
+  FolderWithDetails,
+} from './folders';
+
+export { type FolderFile as FileItem } from './files';
+
+const api = {
+  register: auth.register,
+  login: auth.login,
+  getMe: auth.getMe,
+  getFolders: folders.getFolders,
+  createFolder: folders.createFolder,
+  getFolder: folders.getFolder,
+  deleteFolder: folders.deleteFolder,
+  getFiles: files.getFiles,
+  uploadFile: files.uploadFile,
+  downloadFile: files.downloadFile,
+};
+
+export { api };
