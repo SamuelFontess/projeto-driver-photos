@@ -55,7 +55,8 @@ const armazenamento_disco = multer.diskStorage({
   },
 });
 
-// Middleware de um arquivo; usar após authenticate. Limite 10 MB.
+// Middleware de upload; usar após authenticate, Limite 10 MB por arquivo
+export const files_request_limit = 20;
 
 export const singleFile = multer({
   storage: armazenamento_disco,

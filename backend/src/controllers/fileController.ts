@@ -51,15 +51,9 @@ export async function upload(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const file = req.file;
-    if (!file) {
-      res.status(400).json({ error: 'No file provided' });
-      return;
-    }
-
-    const name = (file.originalname || 'file').trim();
-    if (!name) {
-      res.status(400).json({ error: 'File name is required' });
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files?.length) {
+      res.status(400).json({ error: 'No files provided' });
       return;
     }
 
@@ -76,21 +70,36 @@ export async function upload(req: Request, res: Response): Promise<void> {
       folderId = folderIdParam;
     }
 
-    const relativePath = path.join(userId, file.filename);
+    const created: Array<{
+      id: string;
+      name: string;
+      size: number;
+      mimeType: string;
+      folderId: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }> = [];
 
-    const created = await prisma.file.create({
-      data: {
-        name,
-        path: relativePath,
-        size: file.size,
-        mimeType: file.mimetype || 'application/octet-stream',
-        userId,
-        folderId,
-      },
-      select: CAMPOS_ARQUIVO,
-    });
+    for (const file of files) {
+      const name = (file.originalname || 'file').trim();
+      if (!name) continue;
 
-    res.status(201).json({ file: created });
+      const relativePath = path.join(userId, file.filename);
+      const record = await prisma.file.create({
+        data: {
+          name,
+          path: relativePath,
+          size: file.size,
+          mimeType: file.mimetype || 'application/octet-stream',
+          userId,
+          folderId,
+        },
+        select: CAMPOS_ARQUIVO,
+      });
+      created.push(record);
+    }
+
+    res.status(201).json({ files: created });
   } catch (error) {
     console.error('File upload error:', error);
     res.status(500).json({ error: 'Internal server error' });
