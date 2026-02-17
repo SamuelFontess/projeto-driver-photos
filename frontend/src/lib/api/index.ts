@@ -30,6 +30,7 @@ const api = {
   deleteFolder: folders.deleteFolder,
   getFiles: files.getFiles,
   uploadFile: files.uploadFile,
+  uploadFiles: files.uploadFiles,
   downloadFile: files.downloadFile,
 };
 

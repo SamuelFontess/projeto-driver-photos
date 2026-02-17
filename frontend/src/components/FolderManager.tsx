@@ -5,6 +5,16 @@ import { api, type Folder, type FolderFile } from '@/src/lib/api';
 
 type BreadcrumbItem = { id: string | null; name: string };
 
+// Status de cada arquivo durante o upload
+type UploadItemStatus = 'pending' | 'uploading' | 'done' | 'error';
+
+interface UploadItem {
+  id: string;
+  file: File;
+  status: UploadItemStatus;
+  errorMessage?: string;
+}
+
 // Formata bytes em KB/MB para exibição
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -21,6 +31,8 @@ function formatDate(iso: string): string {
   });
 }
 
+let uploadIdCounter = 0;
+
 export function FolderManager() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: 'Raiz' }]);
@@ -33,10 +45,12 @@ export function FolderManager() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fila de upload com status por arquivo
+  const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
+  const isUploading = uploadQueue.some((item) => item.status === 'uploading' || item.status === 'pending');
 
   const loadFoldersAndFiles = useCallback(async (parentId: string | null) => {
     setLoading(true);
@@ -120,33 +134,79 @@ export function FolderManager() {
     }
   };
 
-  // Envia um arquivo para a pasta atual e recarrega a lista
-  const handleUpload = async (file: File) => {
-    if (uploading) return;
-    setUploading(true);
-    setUploadError(null);
+  // Envia múltiplos arquivos em uma única request
+  // Atualiza o status de cada item na fila conforme o progresso
+  const processUpload = useCallback(async (items: UploadItem[], folderId: string | null) => {
+    const itemIds = items.map((i) => i.id);
+
+    // Marca todos como "uploading"
+    setUploadQueue((prev) =>
+      prev.map((item) =>
+        itemIds.includes(item.id) ? { ...item, status: 'uploading' as const } : item
+      )
+    );
+
     try {
-      await api.uploadFile(file, currentFolderId);
-      await loadFoldersAndFiles(currentFolderId);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      const filesToSend = items.map((i) => i.file);
+      await api.uploadFiles(filesToSend, folderId);
+
+      // Marca todos como "done"
+      setUploadQueue((prev) =>
+        prev.map((item) =>
+          itemIds.includes(item.id) ? { ...item, status: 'done' as const } : item
+        )
+      );
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Erro ao enviar arquivo');
-    } finally {
-      setUploading(false);
+      const message = err instanceof Error ? err.message : 'Erro ao enviar arquivo';
+      // Marca todos como "error"
+      setUploadQueue((prev) =>
+        prev.map((item) =>
+          itemIds.includes(item.id)
+            ? { ...item, status: 'error' as const, errorMessage: message }
+            : item
+        )
+      );
     }
-  };
+
+    // Recarrega a lista de arquivos após o upload
+    await loadFoldersAndFiles(folderId);
+  }, [loadFoldersAndFiles]);
+
+  // Adiciona arquivos à fila e inicia o upload
+  const handleUploadFiles = useCallback(async (fileList: FileList | File[]) => {
+    const filesArray = Array.from(fileList);
+    if (filesArray.length === 0) return;
+
+    const maxPerBatch = 20;
+    const newItems: UploadItem[] = filesArray.map((file) => ({
+      id: `upload-${++uploadIdCounter}`,
+      file,
+      status: 'pending' as const,
+    }));
+
+    setUploadQueue((prev) => [...prev, ...newItems]);
+
+    // Divide em lotes de 20 (limite do backend) e envia sequencialmente
+    for (let i = 0; i < newItems.length; i += maxPerBatch) {
+      const batch = newItems.slice(i, i + maxPerBatch);
+      await processUpload(batch, currentFolderId);
+    }
+
+    // Limpa o input para permitir selecionar os mesmos arquivos novamente
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [currentFolderId, processUpload]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const chosen = e.target.files?.[0];
-    if (chosen) handleUpload(chosen);
+    const chosen = e.target.files;
+    if (chosen && chosen.length > 0) handleUploadFiles(chosen);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleUpload(file);
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) handleUploadFiles(droppedFiles);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -161,7 +221,13 @@ export function FolderManager() {
     setIsDragging(false);
   };
 
+  // Remove itens finalizados (done ou error) da fila de upload
+  const clearFinishedUploads = () => {
+    setUploadQueue((prev) => prev.filter((item) => item.status === 'pending' || item.status === 'uploading'));
+  };
+
   const isRoot = breadcrumb.length <= 1;
+  const hasFinished = uploadQueue.some((item) => item.status === 'done' || item.status === 'error');
 
   return (
     <div className="card" style={{ marginTop: '24px' }}>
@@ -171,18 +237,19 @@ export function FolderManager() {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             onChange={handleFileInputChange}
-            disabled={uploading}
+            disabled={isUploading}
             style={{ display: 'none' }}
             aria-hidden
           />
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => { fileInputRef.current?.click(); setUploadError(null); }}
-            disabled={uploading}
+            onClick={() => { fileInputRef.current?.click(); }}
+            disabled={isUploading}
           >
-            {uploading ? 'Enviando...' : 'Enviar arquivo'}
+            {isUploading ? 'Enviando...' : 'Enviar arquivos'}
           </button>
           <button
             type="button"
@@ -268,7 +335,118 @@ export function FolderManager() {
       )}
 
       {error && <p className="error-message">{error}</p>}
-      {uploadError && <p className="error-message">{uploadError}</p>}
+
+      {/* Painel de progresso do upload múltiplo */}
+      {uploadQueue.length > 0 && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '16px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '6px',
+            border: '1px solid #e9ecef',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
+              Upload de arquivos
+              {isUploading && (
+                <span style={{ fontWeight: 400, color: '#6c757d', marginLeft: '8px' }}>
+                  ({uploadQueue.filter((i) => i.status === 'done').length}/{uploadQueue.length} concluídos)
+                </span>
+              )}
+            </h4>
+            {hasFinished && !isUploading && (
+              <button
+                type="button"
+                onClick={clearFinishedUploads}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6c757d',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  textDecoration: 'underline',
+                  padding: 0,
+                }}
+              >
+                Limpar lista
+              </button>
+            )}
+          </div>
+
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '200px', overflowY: 'auto' }}>
+            {uploadQueue.map((item) => (
+              <li
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 12px',
+                  marginBottom: '4px',
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  fontSize: '14px',
+                }}
+              >
+                {/* Ícone de status */}
+                <span style={{ flexShrink: 0, width: '20px', textAlign: 'center' }}>
+                  {item.status === 'pending' && (
+                    <span style={{ color: '#6c757d' }} title="Aguardando">⏳</span>
+                  )}
+                  {item.status === 'uploading' && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '14px',
+                        height: '14px',
+                        border: '2px solid #e9ecef',
+                        borderTopColor: '#0070f3',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }}
+                      title="Enviando"
+                    />
+                  )}
+                  {item.status === 'done' && (
+                    <span style={{ color: '#28a745' }} title="Concluído">✓</span>
+                  )}
+                  {item.status === 'error' && (
+                    <span style={{ color: '#dc3545' }} title="Erro">✗</span>
+                  )}
+                </span>
+
+                {/* Nome e tamanho */}
+                <span
+                  style={{
+                    flex: '1 1 auto',
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    color: item.status === 'error' ? '#dc3545' : '#333',
+                  }}
+                  title={item.file.name}
+                >
+                  {item.file.name}
+                </span>
+
+                <span style={{ color: '#6c757d', fontSize: '13px', flexShrink: 0 }}>
+                  {formatSize(item.file.size)}
+                </span>
+
+                {/* Mensagem de erro */}
+                {item.status === 'error' && item.errorMessage && (
+                  <span style={{ color: '#dc3545', fontSize: '12px', flexShrink: 0 }} title={item.errorMessage}>
+                    Falha
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {loading ? (
         <p style={{ color: '#6c757d' }}>Carregando pastas e arquivos...</p>
@@ -278,18 +456,21 @@ export function FolderManager() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           style={{
-            padding: isDragging ? '16px' : undefined,
+            padding: isDragging ? '32px 16px' : undefined,
             border: isDragging ? '2px dashed #0070f3' : '2px dashed transparent',
             borderRadius: '6px',
             backgroundColor: isDragging ? 'rgba(0, 112, 243, 0.05)' : undefined,
-            transition: 'border-color 0.15s, background-color 0.15s',
+            transition: 'border-color 0.15s, background-color 0.15s, padding 0.15s',
+            minHeight: '80px',
           }}
         >
           {isDragging && (
-            <p style={{ color: '#0070f3', margin: '0 0 12px', fontWeight: 500 }}>Solte o arquivo aqui</p>
+            <p style={{ color: '#0070f3', margin: '0 0 12px', fontWeight: 500, textAlign: 'center' }}>
+              Solte os arquivos aqui para enviar
+            </p>
           )}
           {folders.length === 0 && files.length === 0 && !error ? (
-            <p style={{ color: '#6c757d' }}>Nenhuma pasta nem arquivo aqui. Crie uma pasta com &quot;Nova pasta&quot; ou envie um arquivo.</p>
+            <p style={{ color: '#6c757d' }}>Nenhuma pasta nem arquivo aqui. Crie uma pasta com &quot;Nova pasta&quot; ou arraste arquivos para enviar.</p>
           ) : (
             <>
               {folders.length > 0 && (
