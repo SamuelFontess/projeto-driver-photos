@@ -8,6 +8,8 @@ export interface Folder {
   parentId: string | null;
   createdAt: string;
   updatedAt: string;
+  childrenCount?: number;
+  filesCount?: number;
 }
 
 export interface CreateFolderPayload {

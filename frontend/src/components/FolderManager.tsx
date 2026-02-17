@@ -664,10 +664,23 @@ export function FolderManager() {
                         marginBottom: '8px',
                         backgroundColor: '#fff',
                         position: 'relative',
+                        gap: '12px',
+                        flexWrap: 'wrap',
                       }}
                     >
-                      <span style={{ fontWeight: 500 }}>📁 {folder.name}</span>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 500, flex: '1 1 auto', minWidth: 0 }} title={folder.name}>
+                        📁 {folder.name}
+                      </span>
+                      <span style={{ color: '#6c757d', fontSize: '14px', flexShrink: 0 }}>
+                        {folder.childrenCount !== undefined && folder.filesCount !== undefined ? (
+                          <>
+                            {folder.childrenCount} {folder.childrenCount === 1 ? 'pasta' : 'pastas'}, {folder.filesCount} {folder.filesCount === 1 ? 'arquivo' : 'arquivos'} · {formatDate(folder.updatedAt)}
+                          </>
+                        ) : (
+                          formatDate(folder.updatedAt)
+                        )}
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                         <button
                           type="button"
                           className="btn btn-primary"

@@ -28,7 +28,27 @@ export async function list(req: Request, res: Response): Promise<void> {
       },
     });
 
-    res.json({ folders });
+    // Adiciona contagens de filhos e arquivos para cada pasta
+    const foldersWithCounts = await Promise.all(
+      folders.map(async (folder) => {
+        const [childrenCount, filesCount] = await Promise.all([
+          prisma.folder.count({
+            where: { parentId: folder.id, userId },
+          }),
+          prisma.file.count({
+            where: { folderId: folder.id, userId },
+          }),
+        ]);
+
+        return {
+          ...folder,
+          childrenCount,
+          filesCount,
+        };
+      })
+    );
+
+    res.json({ folders: foldersWithCounts });
   } catch (error) {
     console.error('Folder list error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -82,7 +102,23 @@ export async function create(req: Request, res: Response): Promise<void> {
       },
     });
 
-    res.status(201).json({ folder });
+    // Adiciona contagens de filhos e arquivos
+    const [childrenCount, filesCount] = await Promise.all([
+      prisma.folder.count({
+        where: { parentId: folder.id, userId },
+      }),
+      prisma.file.count({
+        where: { folderId: folder.id, userId },
+      }),
+    ]);
+
+    res.status(201).json({
+      folder: {
+        ...folder,
+        childrenCount,
+        filesCount,
+      },
+    });
   } catch (error) {
     console.error('Folder create error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -301,7 +337,23 @@ export async function update(req: Request, res: Response): Promise<void> {
       },
     });
 
-    res.json({ folder: updatedFolder });
+    // Adiciona contagens de filhos e arquivos
+    const [childrenCount, filesCount] = await Promise.all([
+      prisma.folder.count({
+        where: { parentId: updatedFolder.id, userId },
+      }),
+      prisma.file.count({
+        where: { folderId: updatedFolder.id, userId },
+      }),
+    ]);
+
+    res.json({
+      folder: {
+        ...updatedFolder,
+        childrenCount,
+        filesCount,
+      },
+    });
   } catch (error) {
     console.error('Folder update error:', error);
     res.status(500).json({ error: 'Internal server error' });
