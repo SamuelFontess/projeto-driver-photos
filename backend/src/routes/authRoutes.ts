@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, me } from '../controllers/authController';
+import { register, login, me, updateProfile } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -8,7 +8,8 @@ const router = Router();
 router.post('/register', register);
 router.post('/login', login);
 
-// Rota protegida (requer autenticação)
+// Rotas protegidas (requerem autenticação)
 router.get('/me', authenticate, me);
+router.patch('/me', authenticate, updateProfile);
 
 export default router;

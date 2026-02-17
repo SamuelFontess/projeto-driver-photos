@@ -141,3 +141,111 @@ export async function me(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const userId = req.user.userId;
+    const { name, email, currentPassword, newPassword } = req.body as {
+      name?: string;
+      email?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    // Busca o usuário atual (precisa do password para validar senha atual)
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!currentUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const updateData: { name?: string; email?: string; password?: string } = {};
+
+    // Atualiza nome se fornecido
+    if (name !== undefined) {
+      if (typeof name !== 'string') {
+        res.status(400).json({ error: 'Name must be a string' });
+        return;
+      }
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        res.status(400).json({ error: 'Name cannot be empty' });
+        return;
+      }
+      updateData.name = trimmedName;
+    }
+
+    // Atualiza email se fornecido
+    if (email !== undefined) {
+      if (typeof email !== 'string' || !email.trim()) {
+        res.status(400).json({ error: 'Email must be a valid string' });
+        return;
+      }
+      const trimmedEmail = email.trim().toLowerCase();
+      
+      // Verifica se o email já está em uso por outro usuário
+      const existingUser = await prisma.user.findUnique({
+        where: { email: trimmedEmail },
+      });
+      if (existingUser && existingUser.id !== userId) {
+        res.status(409).json({ error: 'Email already in use' });
+        return;
+      }
+      updateData.email = trimmedEmail;
+    }
+
+    // Atualiza senha se fornecida
+    if (newPassword !== undefined) {
+      if (!currentPassword) {
+        res.status(400).json({ error: 'Current password is required to change password' });
+        return;
+      }
+      if (typeof newPassword !== 'string' || newPassword.length < 6) {
+        res.status(400).json({ error: 'New password must be at least 6 characters' });
+        return;
+      }
+      
+      // Valida senha atual
+      const isPasswordValid = await comparePassword(currentPassword, currentUser.password);
+      if (!isPasswordValid) {
+        res.status(401).json({ error: 'Current password is incorrect' });
+        return;
+      }
+      
+      // Hash da nova senha
+      updateData.password = await hashPassword(newPassword);
+    }
+
+    // Se não há nada para atualizar
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ error: 'No fields to update' });
+      return;
+    }
+
+    // Atualiza o usuário
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json({ user: updatedUser });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
