@@ -52,6 +52,22 @@ export function FolderManager() {
   const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
   const isUploading = uploadQueue.some((item) => item.status === 'uploading' || item.status === 'pending');
 
+  // Estados para menu de opções e modais
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [moveFolderId, setMoveFolderId] = useState<string | null>(null);
+  const [moveTargetParentId, setMoveTargetParentId] = useState<string | null>(null);
+  const [allFolders, setAllFolders] = useState<Folder[]>([]);
+  const [loadingFoldersForMove, setLoadingFoldersForMove] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [deleteFolderId, setDeleteFolderId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const loadFoldersAndFiles = useCallback(async (parentId: string | null) => {
     setLoading(true);
     setError(null);
@@ -75,6 +91,19 @@ export function FolderManager() {
   useEffect(() => {
     loadFoldersAndFiles(currentFolderId);
   }, [currentFolderId, loadFoldersAndFiles]);
+
+  // Fecha o menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    if (openMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [openMenuId]);
 
   const handleEnterFolder = (folder: Folder) => {
     setCurrentFolderId(folder.id);
@@ -224,6 +253,153 @@ export function FolderManager() {
   // Remove itens finalizados (done ou error) da fila de upload
   const clearFinishedUploads = () => {
     setUploadQueue((prev) => prev.filter((item) => item.status === 'pending' || item.status === 'uploading'));
+  };
+
+  // Carrega todas as pastas recursivamente para o modal de mover
+  const loadAllFolders = useCallback(async () => {
+    setLoadingFoldersForMove(true);
+    try {
+      const all: Folder[] = [];
+      const loadRecursive = async (parentId: string | null = null) => {
+        const { folders } = await api.getFolders(parentId);
+        all.push(...folders);
+        // Carrega filhos recursivamente
+        await Promise.all(folders.map((folder) => loadRecursive(folder.id)));
+      };
+      await loadRecursive(null);
+      setAllFolders(all);
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : 'Erro ao carregar pastas');
+    } finally {
+      setLoadingFoldersForMove(false);
+    }
+  }, []);
+
+  // Abre modal de renomear
+  const handleOpenRename = (folder: Folder) => {
+    setRenameFolderId(folder.id);
+    setRenameFolderName(folder.name);
+    setRenameError(null);
+    setOpenMenuId(null);
+  };
+
+  // Confirma renomear pasta
+  const handleConfirmRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renameFolderId) return;
+    const name = renameFolderName.trim();
+    if (!name) {
+      setRenameError('Digite um nome para a pasta.');
+      return;
+    }
+    setRenaming(true);
+    setRenameError(null);
+    try {
+      await api.updateFolder(renameFolderId, { name });
+      setRenameFolderId(null);
+      setRenameFolderName('');
+      // Atualiza breadcrumb se a pasta renomeada está no caminho atual
+      setBreadcrumb((prev) =>
+        prev.map((item) => (item.id === renameFolderId ? { ...item, name } : item))
+      );
+      await loadFoldersAndFiles(currentFolderId);
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : 'Erro ao renomear pasta');
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  // Abre modal de mover
+  const handleOpenMove = async (folder: Folder) => {
+    setMoveFolderId(folder.id);
+    setMoveTargetParentId(folder.parentId);
+    setMoveError(null);
+    setOpenMenuId(null);
+    await loadAllFolders();
+  };
+
+  // Confirma mover pasta
+  const handleConfirmMove = async () => {
+    if (!moveFolderId) return;
+    setMoving(true);
+    setMoveError(null);
+    try {
+      await api.updateFolder(moveFolderId, { parentId: moveTargetParentId });
+      setMoveFolderId(null);
+      setMoveTargetParentId(null);
+      // Se a pasta movida está no caminho atual, atualiza breadcrumb
+      const movedFolder = folders.find((f) => f.id === moveFolderId);
+      if (movedFolder && breadcrumb.some((b) => b.id === moveFolderId)) {
+        // Se movemos uma pasta que está no breadcrumb, volta para raiz
+        setBreadcrumb([{ id: null, name: 'Raiz' }]);
+        setCurrentFolderId(null);
+      } else {
+        await loadFoldersAndFiles(currentFolderId);
+      }
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : 'Erro ao mover pasta');
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  // Abre confirmação de deletar
+  const handleOpenDelete = (folder: Folder) => {
+    setDeleteFolderId(folder.id);
+    setOpenMenuId(null);
+  };
+
+  // Confirma deletar pasta
+  const handleConfirmDelete = async () => {
+    if (!deleteFolderId) return;
+    setDeleting(true);
+    try {
+      await api.deleteFolder(deleteFolderId);
+      setDeleteFolderId(null);
+      // Se a pasta deletada está no caminho atual, volta para raiz
+      if (breadcrumb.some((b) => b.id === deleteFolderId)) {
+        setBreadcrumb([{ id: null, name: 'Raiz' }]);
+        setCurrentFolderId(null);
+      } else {
+        await loadFoldersAndFiles(currentFolderId);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao deletar pasta');
+      setDeleteFolderId(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Filtra pastas que podem ser destino (exclui a pasta sendo movida e seus descendentes)
+  const getAvailableFolders = (excludeId: string): Folder[] => {
+    const excludeIds = new Set<string>([excludeId]);
+    // Adiciona descendentes recursivamente
+    const addDescendants = (parentId: string) => {
+      allFolders.forEach((f) => {
+        if (f.parentId === parentId && !excludeIds.has(f.id)) {
+          excludeIds.add(f.id);
+          addDescendants(f.id);
+        }
+      });
+    };
+    addDescendants(excludeId);
+    return allFolders.filter((f) => !excludeIds.has(f.id));
+  };
+
+  // Formata nome da pasta com hierarquia para exibição
+  const getFolderDisplayName = (folder: Folder): string => {
+    const path: string[] = [];
+    let current: Folder | undefined = folder;
+    const folderMap = new Map(allFolders.map((f) => [f.id, f]));
+    
+    while (current) {
+      path.unshift(current.name);
+      current = current.parentId ? folderMap.get(current.parentId) : undefined;
+    }
+    
+    return path.join(' / ');
   };
 
   const isRoot = breadcrumb.length <= 1;
@@ -487,17 +663,125 @@ export function FolderManager() {
                         borderRadius: '6px',
                         marginBottom: '8px',
                         backgroundColor: '#fff',
+                        position: 'relative',
                       }}
                     >
                       <span style={{ fontWeight: 500 }}>📁 {folder.name}</span>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleEnterFolder(folder)}
-                        style={{ padding: '8px 16px', fontSize: '14px' }}
-                      >
-                        Entrar
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => handleEnterFolder(folder)}
+                          style={{ padding: '8px 16px', fontSize: '14px' }}
+                        >
+                          Entrar
+                        </button>
+                        <div ref={openMenuId === folder.id ? menuRef : null} style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenMenuId(openMenuId === folder.id ? null : folder.id)}
+                            style={{
+                              padding: '8px 12px',
+                              fontSize: '14px',
+                              background: '#f8f9fa',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              color: '#333',
+                            }}
+                            aria-label="Opções da pasta"
+                          >
+                            ⋮
+                          </button>
+                          {openMenuId === folder.id && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '100%',
+                                marginTop: '4px',
+                                backgroundColor: '#fff',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '6px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                zIndex: 1000,
+                                minWidth: '160px',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleOpenRename(folder)}
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  textAlign: 'left',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  color: '#333',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                Renomear
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenMove(folder)}
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  textAlign: 'left',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  color: '#333',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                Mover
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDelete(folder)}
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  textAlign: 'left',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  color: '#dc3545',
+                                  borderTop: '1px solid #dee2e6',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -545,6 +829,231 @@ export function FolderManager() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Modal de Renomear */}
+      {renameFolderId && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+          }}
+          onClick={() => {
+            if (!renaming) {
+              setRenameFolderId(null);
+              setRenameFolderName('');
+              setRenameError(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#fff',
+              padding: '24px',
+              borderRadius: '8px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: '1.25rem' }}>Renomear pasta</h3>
+            <form onSubmit={handleConfirmRename}>
+              <div className="form-group">
+                <label htmlFor="rename-folder-name" className="form-label">
+                  Novo nome
+                </label>
+                <input
+                  id="rename-folder-name"
+                  type="text"
+                  className="form-input"
+                  value={renameFolderName}
+                  onChange={(e) => setRenameFolderName(e.target.value)}
+                  placeholder="Nome da pasta"
+                  disabled={renaming}
+                  autoFocus
+                />
+                {renameError && <p className="error-message">{renameError}</p>}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setRenameFolderId(null);
+                    setRenameFolderName('');
+                    setRenameError(null);
+                  }}
+                  disabled={renaming}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={renaming}>
+                  {renaming ? 'Renomeando...' : 'Renomear'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Mover */}
+      {moveFolderId && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+          }}
+          onClick={() => {
+            if (!moving && !loadingFoldersForMove) {
+              setMoveFolderId(null);
+              setMoveTargetParentId(null);
+              setMoveError(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#fff',
+              padding: '24px',
+              borderRadius: '8px',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: '1.25rem' }}>Mover pasta</h3>
+            {loadingFoldersForMove ? (
+              <p style={{ color: '#6c757d' }}>Carregando pastas...</p>
+            ) : (
+              <>
+                <div className="form-group">
+                  <label htmlFor="move-folder-target" className="form-label">
+                    Mover para
+                  </label>
+                  <select
+                    id="move-folder-target"
+                    className="form-input"
+                    value={moveTargetParentId ?? ''}
+                    onChange={(e) => setMoveTargetParentId(e.target.value === '' ? null : e.target.value)}
+                    disabled={moving}
+                  >
+                    <option value="">Raiz</option>
+                    {getAvailableFolders(moveFolderId)
+                      .sort((a, b) => getFolderDisplayName(a).localeCompare(getFolderDisplayName(b)))
+                      .map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {getFolderDisplayName(folder)}
+                        </option>
+                      ))}
+                  </select>
+                  {moveError && <p className="error-message">{moveError}</p>}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setMoveFolderId(null);
+                      setMoveTargetParentId(null);
+                      setMoveError(null);
+                    }}
+                    disabled={moving}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleConfirmMove}
+                    disabled={moving}
+                  >
+                    {moving ? 'Movendo...' : 'Mover'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmar Exclusão */}
+      {deleteFolderId && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+          }}
+          onClick={() => {
+            if (!deleting) {
+              setDeleteFolderId(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#fff',
+              padding: '24px',
+              borderRadius: '8px',
+              maxWidth: '400px',
+              width: '90%',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: '1.25rem', color: '#dc3545' }}>Excluir pasta</h3>
+            <p style={{ margin: '0 0 24px', color: '#333' }}>
+              Tem certeza que deseja excluir esta pasta? Todos os arquivos e subpastas dentro dela serão
+              excluídos permanentemente. Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteFolderId(null)}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                style={{ backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+              >
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

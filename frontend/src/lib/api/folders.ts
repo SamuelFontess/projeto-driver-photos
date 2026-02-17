@@ -63,3 +63,18 @@ export async function deleteFolder(id: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+export interface UpdateFolderPayload {
+  name?: string;
+  parentId?: string | null;
+}
+
+export async function updateFolder(
+  id: string,
+  payload: UpdateFolderPayload
+): Promise<{ folder: Folder }> {
+  return request<{ folder: Folder }>(`/api/folders/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}

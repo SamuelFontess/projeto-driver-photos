@@ -16,6 +16,7 @@ export type {
   CreateFolderPayload,
   FolderFile,
   FolderWithDetails,
+  UpdateFolderPayload,
 } from './folders';
 
 export { type FolderFile as FileItem } from './files';
@@ -27,6 +28,7 @@ const api = {
   getFolders: folders.getFolders,
   createFolder: folders.createFolder,
   getFolder: folders.getFolder,
+  updateFolder: folders.updateFolder,
   deleteFolder: folders.deleteFolder,
   getFiles: files.getFiles,
   uploadFile: files.uploadFile,
