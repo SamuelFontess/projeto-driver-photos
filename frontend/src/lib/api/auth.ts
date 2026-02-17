@@ -48,3 +48,17 @@ export async function login(data: LoginData): Promise<AuthResponse> {
 export async function getMe(): Promise<{ user: User }> {
   return request<{ user: User }>('/api/auth/me', { method: 'GET' });
 }
+
+export interface UpdateProfilePayload {
+  name?: string;
+  email?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
+export async function updateProfile(payload: UpdateProfilePayload): Promise<{ user: User }> {
+  return request<{ user: User }>('/api/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}

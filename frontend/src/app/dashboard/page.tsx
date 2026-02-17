@@ -35,29 +35,32 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '20px' }}>
       <div className="container">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '20px 0' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '20px 0', flexWrap: 'wrap', gap: '12px' }}>
           <h1>Dashboard</h1>
-          <button onClick={handleLogout} className="btn btn-danger">
-            Sair
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {user?.name && (
+              <span style={{ color: '#6c757d', fontSize: '14px' }}>
+                Olá, {user.name}
+              </span>
+            )}
+            <button
+              onClick={() => router.push('/dashboard/profile')}
+              className="btn btn-secondary"
+              style={{ padding: '8px 16px', fontSize: '14px' }}
+            >
+              Perfil
+            </button>
+            <button onClick={handleLogout} className="btn btn-danger">
+              Sair
+            </button>
+          </div>
         </header>
 
         <div className="card">
           <h2 style={{ marginBottom: '20px' }}>Bem-vindo!</h2>
-
           <div style={{ marginBottom: '20px' }}>
-            <p><strong>ID:</strong> {user?.id}</p>
             <p><strong>Email:</strong> {user?.email}</p>
             {user?.name && <p><strong>Nome:</strong> {user.name}</p>}
-          </div>
-
-          <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-            <h3 style={{ marginBottom: '10px' }}>Próximos Passos</h3>
-            <ul style={{ paddingLeft: '20px' }}>
-              <li>Upload de arquivos</li>
-              <li>Listagem de arquivos</li>
-              <li>Download de arquivos</li>
-            </ul>
           </div>
         </div>
 

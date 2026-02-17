@@ -9,6 +9,7 @@ export type {
   LoginData,
   AuthResponse,
   User,
+  UpdateProfilePayload,
 } from './auth';
 
 export type {
@@ -25,6 +26,7 @@ const api = {
   register: auth.register,
   login: auth.login,
   getMe: auth.getMe,
+  updateProfile: auth.updateProfile,
   getFolders: folders.getFolders,
   createFolder: folders.createFolder,
   getFolder: folders.getFolder,

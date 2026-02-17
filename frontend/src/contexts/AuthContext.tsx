@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
+  updateUser: (user: User) => void;
   isAuthenticated: boolean;
 }
 
@@ -76,6 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -83,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!token && !!user,
   };
 
