@@ -1,17 +1,29 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { loginSchema, type LoginFormData } from '@/src/features/auth/schemas';
+import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
+import { Label } from '@/src/components/ui/label';
 import Link from 'next/link';
+import { useToast } from '@/src/hooks/use-toast';
+import { Loader2, HardDrive } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
 
   // Redirecionar se já estiver autenticado
   if (isAuthenticated) {
@@ -19,73 +31,87 @@ export default function LoginPage() {
     return null;
   }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
+  const onSubmit = async (data: LoginFormData) => {
     try {
-      await login(email, password);
+      await login(data.email, data.password);
+      toast({
+        title: 'Login realizado com sucesso!',
+        description: 'Redirecionando...',
+      });
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao fazer login');
-    } finally {
-      setLoading(false);
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao fazer login',
+        description: err instanceof Error ? err.message : 'Credenciais inválidas',
+        variant: 'destructive',
+      });
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
-        <h1 style={{ marginBottom: '24px', textAlign: 'center' }}>Login</h1>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">
-              Email
-            </label>
-            <input
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <div className="w-full max-w-[440px] space-y-8 p-12">
+        <div className="flex items-center gap-3">
+          <HardDrive className="h-7 w-7 text-primary" />
+          <span className="font-semibold text-lg text-foreground">Driver</span>
+        </div>
+
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold text-foreground">Entrar</h1>
+          <p className="text-sm text-muted-foreground">
+            Acesse sua conta para continuar
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-muted-foreground">Email</Label>
+            <Input
               id="email"
               type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
               placeholder="seu@email.com"
+              {...register('email')}
+              className={errors.email ? 'border-destructive' : ''}
             />
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">
-              Senha
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-muted-foreground">Senha</Label>
+            <Input
               id="password"
               type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
               placeholder="••••••••"
+              {...register('password')}
+              className={errors.password ? 'border-destructive' : ''}
             />
+            {errors.password && (
+              <p className="text-sm text-destructive">{errors.password.message}</p>
+            )}
           </div>
 
-          {error && <div className="error-message">{error}</div>}
-
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: '20px' }}
-            disabled={loading}
+            className="w-full h-12"
+            disabled={isSubmitting}
           >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Entrando...
+              </>
+            ) : (
+              'Entrar'
+            )}
+          </Button>
         </form>
 
-        <p style={{ marginTop: '20px', textAlign: 'center', color: '#666' }}>
-          Não tem uma conta?{' '}
-          <Link href="/register" style={{ color: '#0070f3' }}>
-            Registre-se
+        <p className="text-center text-sm text-muted-foreground">
+          Não tem conta?{' '}
+          <Link href="/register" className="text-primary hover:underline font-medium">
+            Criar conta
           </Link>
         </p>
       </div>

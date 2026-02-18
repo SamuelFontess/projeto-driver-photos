@@ -1,13 +1,19 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { api, type UpdateProfilePayload } from '@/src/lib/api';
+import { useToast } from '@/src/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
+import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
+import { Label } from '@/src/components/ui/label';
+import { Loader2, User, Lock, ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, loading: authLoading, updateUser } = useAuth();
-  const router = useRouter();
+  const { user, updateUser } = useAuth();
+  const { toast } = useToast();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -16,14 +22,6 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     if (user) {
@@ -32,23 +30,20 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
 
-    // Validação de senha se campos de senha estão visíveis
     if (showPasswordFields) {
       if (!currentPassword) {
-        setError('Digite a senha atual para alterar a senha.');
+        toast({ title: 'Erro', description: 'Digite a senha atual para alterar a senha.', variant: 'destructive' });
         return;
       }
       if (!newPassword || newPassword.length < 6) {
-        setError('A nova senha deve ter pelo menos 6 caracteres.');
+        toast({ title: 'Erro', description: 'A nova senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
         return;
       }
       if (newPassword !== confirmPassword) {
-        setError('As senhas não coincidem.');
+        toast({ title: 'Erro', description: 'As senhas não coincidem.', variant: 'destructive' });
         return;
       }
     }
@@ -57,190 +52,197 @@ export default function ProfilePage() {
 
     try {
       const payload: UpdateProfilePayload = {};
-      
+
       if (name.trim() !== (user?.name || '')) {
         payload.name = name.trim();
       }
-      
+
       if (email.trim().toLowerCase() !== (user?.email || '').toLowerCase()) {
         payload.email = email.trim().toLowerCase();
       }
-      
+
       if (showPasswordFields && newPassword) {
         payload.currentPassword = currentPassword;
         payload.newPassword = newPassword;
       }
 
       if (Object.keys(payload).length === 0) {
-        setError('Nenhuma alteração foi feita.');
+        toast({ title: 'Nenhuma alteração', description: 'Nenhuma alteração foi feita.', variant: 'destructive' });
         setSaving(false);
         return;
       }
 
       const response = await api.updateProfile(payload);
       updateUser(response.user);
-      
-      setSuccess('Perfil atualizado com sucesso!');
+
+      toast({ title: 'Perfil atualizado', description: 'Suas informações foram salvas com sucesso.' });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordFields(false);
-      
-      // Limpa mensagem de sucesso após 3 segundos
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao atualizar perfil');
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao atualizar perfil',
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  if (authLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <p>Carregando...</p>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
+  const togglePasswordFields = () => {
+    setShowPasswordFields((prev) => !prev);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
 
   return (
-    <div style={{ minHeight: '100vh', padding: '20px' }}>
-      <div className="container">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '20px 0' }}>
-          <h1>Perfil</h1>
-          <button onClick={() => router.push('/dashboard')} className="btn btn-secondary">
-            Voltar ao Dashboard
-          </button>
-        </header>
+    <div className="flex flex-col h-full">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-16 items-center gap-4 px-6">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Voltar
+            </Button>
+          </Link>
+          <h1 className="text-lg font-semibold">Perfil</h1>
+        </div>
+      </header>
 
-        <div className="card">
-          <h2 style={{ marginBottom: '20px' }}>Editar Perfil</h2>
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="mx-auto max-w-2xl space-y-6">
+          {/* Dados pessoais */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Informações pessoais</CardTitle>
+                  <CardDescription>Atualize seu nome e email.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-name">Nome</Label>
+                    <Input
+                      id="profile-name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Seu nome"
+                      disabled={saving}
+                    />
+                  </div>
 
-          {error && <p className="error-message" style={{ marginBottom: '16px' }}>{error}</p>}
-          {success && (
-            <p style={{ marginBottom: '16px', color: '#28a745', backgroundColor: '#d4edda', padding: '12px', borderRadius: '6px', border: '1px solid #c3e6cb' }}>
-              {success}
-            </p>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="profile-name" className="form-label">
-                Nome
-              </label>
-              <input
-                id="profile-name"
-                type="text"
-                className="form-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Seu nome"
-                disabled={saving}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="profile-email" className="form-label">
-                Email
-              </label>
-              <input
-                id="profile-email"
-                type="email"
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                disabled={saving}
-              />
-              <p style={{ marginTop: '8px', fontSize: '14px', color: '#6c757d' }}>
-                Ao alterar o email, você pode precisar fazer login novamente.
-              </p>
-            </div>
-
-            <div style={{ marginTop: '24px', marginBottom: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowPasswordFields(!showPasswordFields);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                  setError(null);
-                }}
-                disabled={saving}
-              >
-                {showPasswordFields ? 'Cancelar alteração de senha' : 'Alterar senha'}
-              </button>
-            </div>
-
-            {showPasswordFields && (
-              <>
-                <div className="form-group">
-                  <label htmlFor="profile-current-password" className="form-label">
-                    Senha atual
-                  </label>
-                  <input
-                    id="profile-current-password"
-                    type="password"
-                    className="form-input"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Digite sua senha atual"
-                    disabled={saving}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-email">Email</Label>
+                    <Input
+                      id="profile-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                      disabled={saving}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Ao alterar o email, você pode precisar fazer login novamente.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="profile-new-password" className="form-label">
-                    Nova senha
-                  </label>
-                  <input
-                    id="profile-new-password"
-                    type="password"
-                    className="form-input"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    disabled={saving}
-                  />
+                {/* Seção de senha */}
+                <div className="border-t pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <Lock className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Senha</p>
+                        <p className="text-sm text-muted-foreground">Altere sua senha de acesso.</p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={togglePasswordFields}
+                      disabled={saving}
+                    >
+                      {showPasswordFields ? 'Cancelar' : 'Alterar senha'}
+                    </Button>
+                  </div>
+
+                  {showPasswordFields && (
+                    <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-current-password">Senha atual</Label>
+                        <Input
+                          id="profile-current-password"
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Digite sua senha atual"
+                          disabled={saving}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-new-password">Nova senha</Label>
+                        <Input
+                          id="profile-new-password"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Mínimo 6 caracteres"
+                          disabled={saving}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-confirm-password">Confirmar nova senha</Label>
+                        <Input
+                          id="profile-confirm-password"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Digite a nova senha novamente"
+                          disabled={saving}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="profile-confirm-password" className="form-label">
-                    Confirmar nova senha
-                  </label>
-                  <input
-                    id="profile-confirm-password"
-                    type="password"
-                    className="form-input"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Digite a nova senha novamente"
-                    disabled={saving}
-                  />
+                {/* Ações */}
+                <div className="flex items-center gap-3 pt-2">
+                  <Button type="submit" disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      'Salvar alterações'
+                    )}
+                  </Button>
+                  <Link href="/dashboard">
+                    <Button type="button" variant="outline" disabled={saving}>
+                      Cancelar
+                    </Button>
+                  </Link>
                 </div>
-              </>
-            )}
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Salvando...' : 'Salvar alterações'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => router.push('/dashboard')}
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

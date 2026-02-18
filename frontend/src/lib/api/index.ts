@@ -3,6 +3,7 @@
 import * as auth from './auth';
 import * as folders from './folders';
 import * as files from './files';
+export { ApiError } from './client';
 
 export type {
   RegisterData,
@@ -17,7 +18,6 @@ export type {
   CreateFolderPayload,
   FolderFile,
   FolderWithDetails,
-  UpdateFolderPayload,
 } from './folders';
 
 export { type FolderFile as FileItem } from './files';
@@ -29,8 +29,8 @@ const api = {
   updateProfile: auth.updateProfile,
   getFolders: folders.getFolders,
   createFolder: folders.createFolder,
-  getFolder: folders.getFolder,
   updateFolder: folders.updateFolder,
+  getFolder: folders.getFolder,
   deleteFolder: folders.deleteFolder,
   getFiles: files.getFiles,
   uploadFile: files.uploadFile,

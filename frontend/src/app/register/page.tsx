@@ -1,19 +1,29 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { registerSchema, type RegisterFormData } from '@/src/features/auth/schemas';
+import { Button } from '@/src/components/ui/Button';
+import { Input } from '@/src/components/ui/input';
+import { Label } from '@/src/components/ui/label';
 import Link from 'next/link';
+import { useToast } from '@/src/hooks/use-toast';
+import { Loader2, HardDrive } from 'lucide-react';
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const { register, isAuthenticated } = useAuth();
+  const { register: registerUser, isAuthenticated } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+  });
 
   // Redirecionar se já estiver autenticado
   if (isAuthenticated) {
@@ -21,93 +31,99 @@ export default function RegisterPage() {
     return null;
   }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess(false);
-    setLoading(true);
-
+  const onSubmit = async (data: RegisterFormData) => {
     try {
-      await register(email, password, name || undefined);
-      setSuccess(true);
+      await registerUser(data.email, data.password, data.name);
+      toast({
+        title: 'Conta criada com sucesso!',
+        description: 'Redirecionando...',
+      });
       setTimeout(() => {
         router.push('/dashboard');
       }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao criar conta');
-    } finally {
-      setLoading(false);
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao criar conta',
+        description: err instanceof Error ? err.message : 'Não foi possível criar a conta',
+        variant: 'destructive',
+      });
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
-        <h1 style={{ marginBottom: '24px', textAlign: 'center' }}>Criar Conta</h1>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="name">
-              Nome (opcional)
-            </label>
-            <input
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <div className="w-full max-w-[440px] space-y-7 p-12">
+        <div className="flex items-center gap-3">
+          <HardDrive className="h-7 w-7 text-primary" />
+          <span className="font-semibold text-lg text-foreground">Driver</span>
+        </div>
+
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold text-foreground">Criar conta</h1>
+          <p className="text-sm text-muted-foreground">
+            Preencha os dados para começar
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-muted-foreground">Nome</Label>
+            <Input
               id="name"
               type="text"
-              className="form-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
               placeholder="Seu nome"
+              {...register('name')}
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">
-              Email
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-muted-foreground">Email</Label>
+            <Input
               id="email"
               type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
               placeholder="seu@email.com"
+              {...register('email')}
+              className={errors.email ? 'border-destructive' : ''}
             />
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">
-              Senha
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-muted-foreground">Senha</Label>
+            <Input
               id="password"
               type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
               placeholder="Mínimo 6 caracteres"
+              {...register('password')}
+              className={errors.password ? 'border-destructive' : ''}
             />
+            {errors.password && (
+              <p className="text-sm text-destructive">{errors.password.message}</p>
+            )}
           </div>
 
-          {error && <div className="error-message">{error}</div>}
-          {success && <div className="success-message">Conta criada com sucesso! Redirecionando...</div>}
-
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: '20px' }}
-            disabled={loading}
+            className="w-full h-12"
+            disabled={isSubmitting}
           >
-            {loading ? 'Criando conta...' : 'Criar Conta'}
-          </button>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Criando conta...
+              </>
+            ) : (
+              'Criar conta'
+            )}
+          </Button>
         </form>
 
-        <p style={{ marginTop: '20px', textAlign: 'center', color: '#666' }}>
-          Já tem uma conta?{' '}
-          <Link href="/login" style={{ color: '#0070f3' }}>
-            Faça login
+        <p className="text-center text-sm text-muted-foreground">
+          Já tem conta?{' '}
+          <Link href="/login" className="text-primary hover:underline font-medium">
+            Entrar
           </Link>
         </p>
       </div>
