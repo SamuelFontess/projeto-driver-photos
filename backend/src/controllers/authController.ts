@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 
@@ -58,7 +59,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       token,
     });
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error('Register error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -107,7 +108,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       token,
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -137,7 +138,7 @@ export async function me(req: Request, res: Response): Promise<void> {
 
     res.json({ user });
   } catch (error) {
-    console.error('Me error:', error);
+    logger.error('Me error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -245,7 +246,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
 
     res.json({ user: updatedUser });
   } catch (error) {
-    console.error('Update profile error:', error);
+    logger.error('Update profile error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

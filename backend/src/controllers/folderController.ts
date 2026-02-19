@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 
 // Lista pastas do usuário autenticado (query opcional parentId: omitido/null = raiz).
 export async function list(req: Request, res: Response): Promise<void> {
@@ -50,7 +51,7 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     res.json({ folders: foldersWithCounts });
   } catch (error) {
-    console.error('Folder list error:', error);
+    logger.error('Folder list error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -120,7 +121,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('Folder create error:', error);
+    logger.error('Folder create error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -172,7 +173,7 @@ export async function get(req: Request, res: Response): Promise<void> {
 
     res.json({ folder });
   } catch (error) {
-    console.error('Folder get error:', error);
+    logger.error('Folder get error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -203,7 +204,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Folder delete error:', error);
+    logger.error('Folder delete error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -355,7 +356,7 @@ export async function update(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('Folder update error:', error);
+    logger.error('Folder update error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import { PASTA_UPLOAD } from '../lib/uploads';
 
 const CAMPOS_ARQUIVO = {
@@ -38,7 +39,7 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     res.json({ files });
   } catch (error) {
-    console.error('File list error:', error);
+    logger.error('File list error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -101,7 +102,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
 
     res.status(201).json({ files: created });
   } catch (error) {
-    console.error('File upload error:', error);
+    logger.error('File upload error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -128,7 +129,7 @@ export async function download(req: Request, res: Response): Promise<void> {
 
     const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
     if (!fs.existsSync(absolutePath)) {
-      console.error('File on disk missing:', absolutePath);
+      logger.warn('File on disk missing', { path: absolutePath });
       res.status(404).json({ error: 'File not found' });
       return;
     }
@@ -142,13 +143,13 @@ export async function download(req: Request, res: Response): Promise<void> {
 
     const stream = fs.createReadStream(absolutePath);
     stream.on('error', (err) => {
-      console.error('File stream error:', err);
+      logger.error('File stream error', err);
       if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
       else res.end();
     });
     stream.pipe(res);
   } catch (error) {
-    console.error('File download error:', error);
+    logger.error('File download error', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -176,7 +177,7 @@ export async function get(req: Request, res: Response): Promise<void> {
 
     res.json({ file });
   } catch (error) {
-    console.error('File get error:', error);
+    logger.error('File get error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -253,7 +254,7 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     res.json({ file: updatedFile });
   } catch (error) {
-    console.error('File update error:', error);
+    logger.error('File update error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -283,7 +284,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
       if (err.code !== 'ENOENT') {
-        console.error('File delete from disk error:', err);
+        logger.error('File delete from disk error', err);
         res.status(500).json({ error: 'Internal server error' });
         return;
       }
@@ -295,7 +296,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     res.status(204).send();
   } catch (error) {
-    console.error('File remove error:', error);
+    logger.error('File remove error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

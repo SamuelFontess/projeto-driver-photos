@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
 import fileRoutes from './routes/fileRoutes';
+import { logger } from './lib/logger';
 import { ensureUploadDir } from './lib/uploads';
 import { files_request_limit } from './lib/multer';
 
@@ -32,7 +33,7 @@ app.use('/api/files', fileRoutes);
 
 // Error handling middleware (multer/fileFilter errors → 400)
 app.use((err: Error & { code?: string }, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  logger.error('Unhandled middleware error', err);
   if (err.message?.includes('File type not allowed')) {
     res.status(400).json({ error: err.message });
     return;
