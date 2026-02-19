@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/src/components/ui/dialog';
-import { Button } from '@/src/components/ui/button';
+import { Button } from '@/src/components/ui';
 import { type FolderFile } from '@/src/lib/api';
 import { Download, File as FileIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';

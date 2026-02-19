@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Button } from '@/src/components/ui/button';
+import { Button } from '@/src/components/ui';
 import { Plus, Upload, Grid3x3, List } from 'lucide-react';
 import {
   Dialog,

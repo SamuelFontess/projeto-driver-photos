@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { Spinner } from '@/src/components/ui';
+import { Loader2 } from 'lucide-react';
 
 export function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -17,8 +17,11 @@ export function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="container" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        <Spinner label="Preparando acesso..." />
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Preparando acesso...</p>
+        </div>
       </div>
     );
   }

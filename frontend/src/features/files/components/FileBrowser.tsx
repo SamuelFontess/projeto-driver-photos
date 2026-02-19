@@ -36,7 +36,7 @@ import {
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
-import { Button } from '@/src/components/ui/Button';
+import { Button } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/use-toast';
 import { type Folder, type FolderFile } from '@/src/lib/api';
 import { type BreadcrumbItem, type ViewMode } from '../types';

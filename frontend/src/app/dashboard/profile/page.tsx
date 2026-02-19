@@ -4,10 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { api, type UpdateProfilePayload } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
-import { Button } from '@/src/components/ui/button';
-import { Input } from '@/src/components/ui/input';
-import { Label } from '@/src/components/ui/label';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@/src/components/ui';
 import { Loader2, User, Lock, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 

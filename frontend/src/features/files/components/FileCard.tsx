@@ -1,7 +1,7 @@
 'use client';
 
 import { File, Download, MoreVertical, Eye } from 'lucide-react';
-import { Button } from '@/src/components/ui/button';
+import { Button } from '@/src/components/ui';
 import {
   DropdownMenu,
   DropdownMenuContent,
