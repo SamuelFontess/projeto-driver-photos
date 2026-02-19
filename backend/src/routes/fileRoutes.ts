@@ -9,6 +9,7 @@ import {
   updateFileSchema,
   uploadFilesBodySchema,
 } from '../validation/fileSchemas';
+import { fileUploadRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.get('/', authenticate, validate(listFilesQuerySchema, 'query'), list);
 router.post(
   '/',
   authenticate,
+  fileUploadRateLimiter,
   singleFile.array('files', files_request_limit),
   validate(uploadFilesBodySchema),
   upload

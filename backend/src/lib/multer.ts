@@ -5,7 +5,16 @@ import { Request } from 'express';
 import { randomUUID } from 'crypto';
 import { PASTA_UPLOAD } from './uploads';
 
-const TIPOS_PERMITIDOS = new Set([
+const DEFAULT_MAX_UPLOAD_FILE_SIZE_MB = 10;
+const parsedMaxUploadFileSizeMb = Number(process.env.UPLOAD_MAX_FILE_SIZE_MB);
+const maxUploadFileSizeMb =
+  Number.isFinite(parsedMaxUploadFileSizeMb) && parsedMaxUploadFileSizeMb > 0
+    ? parsedMaxUploadFileSizeMb
+    : DEFAULT_MAX_UPLOAD_FILE_SIZE_MB;
+
+export const max_upload_file_size_bytes = Math.floor(maxUploadFileSizeMb * 1024 * 1024);
+
+export const allowed_upload_mime_types = new Set([
   'application/pdf',
   'application/json',
   'application/zip',
@@ -20,13 +29,17 @@ const TIPOS_PERMITIDOS = new Set([
   'text/html',
 ]);
 
+export function isAllowedUploadMimeType(mimeType: string): boolean {
+  const mime = (mimeType || 'application/octet-stream').toLowerCase();
+  return allowed_upload_mime_types.has(mime);
+}
+
 function fileFilter(
   _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ): void {
-  const mime = (file.mimetype || 'application/octet-stream').toLowerCase();
-  if (TIPOS_PERMITIDOS.has(mime)) {
+  if (isAllowedUploadMimeType(file.mimetype)) {
     cb(null, true);
     return;
   }
@@ -55,11 +68,11 @@ const armazenamento_disco = multer.diskStorage({
   },
 });
 
-// Middleware de upload; usar após authenticate, Limite 10 MB por arquivo
+// Middleware de upload; usar após authenticate, limite por arquivo configurável
 export const files_request_limit = 20;
 
 export const singleFile = multer({
   storage: armazenamento_disco,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: max_upload_file_size_bytes },
   fileFilter,
 });

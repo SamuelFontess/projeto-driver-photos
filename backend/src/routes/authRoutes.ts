@@ -3,8 +3,11 @@ import { register, login, me, updateProfile } from '../controllers/authControlle
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { loginSchema, registerSchema, updateProfileSchema } from '../validation/authSchemas';
+import { authRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
+
+router.use(authRateLimiter);
 
 // Rotas públicas
 router.post('/register', validate(registerSchema), register);

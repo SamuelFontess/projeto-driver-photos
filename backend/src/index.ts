@@ -6,7 +6,7 @@ import folderRoutes from './routes/folderRoutes';
 import fileRoutes from './routes/fileRoutes';
 import { logger } from './lib/logger';
 import { ensureUploadDir } from './lib/uploads';
-import { files_request_limit } from './lib/multer';
+import { files_request_limit, max_upload_file_size_bytes } from './lib/multer';
 
 dotenv.config();
 
@@ -39,7 +39,9 @@ app.use((err: Error & { code?: string }, req: express.Request, res: express.Resp
     return;
   }
   if (err.code === 'LIMIT_FILE_SIZE') {
-    res.status(400).json({ error: 'File too large (max 10 MB)' });
+    res
+      .status(400)
+      .json({ error: `File too large (max ${Math.floor(max_upload_file_size_bytes / (1024 * 1024))} MB)` });
     return;
   }
   if (err.code === 'LIMIT_FILE_COUNT') {

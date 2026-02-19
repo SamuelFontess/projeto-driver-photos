@@ -4,6 +4,7 @@ import path from 'path';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { PASTA_UPLOAD } from '../lib/uploads';
+import { isAllowedUploadMimeType, max_upload_file_size_bytes } from '../lib/multer';
 
 const CAMPOS_ARQUIVO = {
   id: true,
@@ -15,6 +16,21 @@ const CAMPOS_ARQUIVO = {
   updatedAt: true,
 } as const;
 
+async function cleanupUploadedFiles(files: Express.Multer.File[]): Promise<void> {
+  await Promise.all(
+    files.map(async (file) => {
+      if (!file.path) return;
+      try {
+        await fs.promises.unlink(file.path);
+      } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        if (err.code !== 'ENOENT') {
+          logger.warn('Failed to cleanup uploaded file', { path: file.path, error: err.message });
+        }
+      }
+    })
+  );
+}
 
 export async function list(req: Request, res: Response): Promise<void> {
   try {
@@ -55,6 +71,24 @@ export async function upload(req: Request, res: Response): Promise<void> {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {
       res.status(400).json({ error: 'No files provided' });
+      return;
+    }
+
+    const invalidMimeFile = files.find((file) => !isAllowedUploadMimeType(file.mimetype));
+    if (invalidMimeFile) {
+      await cleanupUploadedFiles(files);
+      res
+        .status(400)
+        .json({ error: `File type not allowed: ${invalidMimeFile.mimetype || 'unknown'}` });
+      return;
+    }
+
+    const oversizedFile = files.find((file) => file.size > max_upload_file_size_bytes);
+    if (oversizedFile) {
+      await cleanupUploadedFiles(files);
+      res
+        .status(400)
+        .json({ error: `File too large (max ${Math.floor(max_upload_file_size_bytes / (1024 * 1024))} MB)` });
       return;
     }
 
