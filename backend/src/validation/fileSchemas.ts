@@ -22,6 +22,14 @@ export const fileIdParamSchema = z.object({
 
 export const listFilesQuerySchema = z.object({
   folderId: optionalFolderIdSchema,
+  search: z
+    .preprocess((value) => {
+      if (value === undefined) return undefined;
+      if (Array.isArray(value)) return value[0];
+      if (typeof value !== 'string') return value;
+      const normalized = value.trim();
+      return normalized.length ? normalized : undefined;
+    }, z.string().min(1).max(120).optional()),
 });
 
 export const uploadFilesBodySchema = z.object({

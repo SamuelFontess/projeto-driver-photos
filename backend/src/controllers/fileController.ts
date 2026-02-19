@@ -41,14 +41,27 @@ export async function list(req: Request, res: Response): Promise<void> {
     }
 
     const folderIdParam = req.query.folderId as string | undefined;
+    const searchParam =
+      typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
     const isRoot =
       folderIdParam === undefined || folderIdParam === '' || folderIdParam === 'null';
 
+    const whereClause =
+      searchParam && searchParam.length > 0
+        ? {
+            userId,
+            name: {
+              contains: searchParam,
+              mode: 'insensitive' as const,
+            },
+          }
+        : {
+            userId,
+            folderId: isRoot ? null : folderIdParam,
+          };
+
     const files = await prisma.file.findMany({
-      where: {
-        userId,
-        folderId: isRoot ? null : folderIdParam,
-      },
+      where: whereClause,
       orderBy: { name: 'asc' },
       select: CAMPOS_ARQUIVO,
     });

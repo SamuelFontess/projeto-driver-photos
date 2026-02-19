@@ -14,7 +14,6 @@ import { UploadZone } from './UploadZone';
 import { FilePreviewModal } from './FilePreviewModal';
 import { Header } from '@/src/components/layout/header';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { Skeleton } from '@/src/components/ui/Skeleton';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +36,7 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { Button } from '@/src/components/ui';
+import { Skeleton } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/use-toast';
 import { type Folder, type FolderFile } from '@/src/lib/api';
 import { type BreadcrumbItem, type ViewMode } from '../types';
@@ -116,7 +116,7 @@ export function FileBrowser() {
     : files.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleEnterFolder = useCallback((folder: Folder) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams.toString());
     params.set('folder', folder.id);
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
@@ -125,7 +125,7 @@ export function FileBrowser() {
     if (item.id === null) {
       router.push('/dashboard');
     } else {
-      const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(searchParams.toString());
       params.set('folder', item.id);
       router.push(`/dashboard?${params.toString()}`);
     }

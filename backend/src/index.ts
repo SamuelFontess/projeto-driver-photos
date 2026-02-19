@@ -1,58 +1,50 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-import authRoutes from './routes/authRoutes';
-import folderRoutes from './routes/folderRoutes';
-import fileRoutes from './routes/fileRoutes';
-import { logger } from './lib/logger';
-import { ensureUploadDir } from './lib/uploads';
-import { files_request_limit, max_upload_file_size_bytes } from './lib/multer';
+import fs from 'fs';
+import path from 'path';
 
-dotenv.config();
+const envArg = process.argv.find((arg) => arg.startsWith('--env-file='));
+const envFileFromArg = envArg?.replace('--env-file=', '').trim();
 
-ensureUploadDir();
+if (!envFileFromArg) {
+  throw new Error(
+    'Missing required --env-file argument. Use npm run dev (for .env.local) or npm run start (for .env).'
+  );
+}
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const envFileName = envFileFromArg;
+const backendRootPath = path.resolve(__dirname, '..');
+const envFilePath = path.resolve(backendRootPath, envFileName);
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
-  credentials: true,
-}));
-app.use(express.json());
+if (!fs.existsSync(envFilePath)) {
+  throw new Error(
+    `Missing required environment file: ${envFileName}. ` +
+      `Create ${envFileName} in backend/ before starting the server.`
+  );
+}
 
-// Routes
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
+const dotenvResult = dotenv.config({ path: envFilePath });
+if (dotenvResult.error) {
+  throw dotenvResult.error;
+}
 
-app.use('/api/auth', authRoutes);
-app.use('/api/folders', folderRoutes);
-app.use('/api/files', fileRoutes);
+async function bootstrap() {
+  const { ensureUploadDir } = await import('./lib/uploads');
+  const { app } = await import('./app');
 
-// Error handling middleware (multer/fileFilter errors → 400)
-app.use((err: Error & { code?: string }, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error('Unhandled middleware error', err);
-  if (err.message?.includes('File type not allowed')) {
-    res.status(400).json({ error: err.message });
-    return;
+  ensureUploadDir();
+
+  const PORT = process.env.PORT || 3000;
+  if (require.main === module) {
+    app.listen(PORT, () => {
+      console.log(`Loaded environment from ${envFileName}`);
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+      console.log(`Auth routes: http://localhost:${PORT}/api/auth`);
+    });
   }
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    res
-      .status(400)
-      .json({ error: `File too large (max ${Math.floor(max_upload_file_size_bytes / (1024 * 1024))} MB)` });
-    return;
-  }
-  if (err.code === 'LIMIT_FILE_COUNT') {
-    res.status(400).json({ error: 'Too many files (limit: ' + files_request_limit + ')' });
-    return;
-  }
-  res.status(500).json({ error: 'Internal server error' });
-});
+}
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`Auth routes: http://localhost:${PORT}/api/auth`);
+bootstrap().catch((error) => {
+  console.error('Failed to bootstrap server:', error);
+  process.exit(1);
 });
