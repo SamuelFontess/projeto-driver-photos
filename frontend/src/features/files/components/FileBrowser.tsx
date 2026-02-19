@@ -52,6 +52,7 @@ export function FileBrowser() {
   ]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const normalizedSearchQuery = searchQuery.trim();
   
   // Dialog States
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export function FileBrowser() {
 
   // Queries
   const { data: foldersData, isLoading: foldersLoading } = useFolders(currentFolderId);
-  const { data: filesData, isLoading: filesLoading } = useFiles(currentFolderId);
+  const { data: filesData, isLoading: filesLoading } = useFiles(currentFolderId, normalizedSearchQuery);
   
   // Mutations
   const createFolder = useCreateFolder();
@@ -110,9 +111,9 @@ export function FileBrowser() {
   const filteredFolders = folders.filter((folder) =>
     folder.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredFiles = files.filter((file) =>
-    file.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredFiles = normalizedSearchQuery
+    ? files
+    : files.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleEnterFolder = useCallback((folder: Folder) => {
     const params = new URLSearchParams(searchParams);

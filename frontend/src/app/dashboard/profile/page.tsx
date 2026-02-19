@@ -7,6 +7,7 @@ import { useToast } from '@/src/hooks/use-toast';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@/src/components/ui';
 import { Loader2, User, Lock, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { profilePasswordSchema } from '@/src/features/auth/schemas';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -31,16 +32,18 @@ export default function ProfilePage() {
     e.preventDefault();
 
     if (showPasswordFields) {
-      if (!currentPassword) {
-        toast({ title: 'Erro', description: 'Digite a senha atual para alterar a senha.', variant: 'destructive' });
-        return;
-      }
-      if (!newPassword || newPassword.length < 6) {
-        toast({ title: 'Erro', description: 'A nova senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        toast({ title: 'Erro', description: 'As senhas não coincidem.', variant: 'destructive' });
+      const passwordValidation = profilePasswordSchema.safeParse({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+
+      if (!passwordValidation.success) {
+        toast({
+          title: 'Erro',
+          description: passwordValidation.error.issues[0]?.message ?? 'Dados de senha inválidos.',
+          variant: 'destructive',
+        });
         return;
       }
     }

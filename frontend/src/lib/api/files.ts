@@ -10,12 +10,21 @@ export interface UpdateFilePayload {
   folderId?: string | null;
 }
 
+export interface GetFilesParams {
+  folderId?: string | null;
+  search?: string;
+}
+
 export async function getFiles(
-  folderId?: string | null
+  queryParams: GetFilesParams = {}
 ): Promise<{ files: FolderFile[] }> {
+  const { folderId, search } = queryParams;
   const params = new URLSearchParams();
   if (folderId !== undefined && folderId !== null) {
     params.set('folderId', folderId);
+  }
+  if (search && search.trim().length > 0) {
+    params.set('search', search.trim());
   }
   const query = params.toString();
   return request<{ files: FolderFile[] }>(

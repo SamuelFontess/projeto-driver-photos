@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { ModeToggle } from '@/src/components/mode-toggle';
