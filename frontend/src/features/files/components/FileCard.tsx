@@ -16,10 +16,11 @@ interface FileCardProps {
   file: FolderFile;
   onDownload: (file: FolderFile) => void;
   onPreview: (file: FolderFile) => void;
+  onDelete: (file: FolderFile) => void;
   isDownloading?: boolean;
 }
 
-export function FileCard({ file, onDownload, onPreview, isDownloading }: FileCardProps) {
+export function FileCard({ file, onDownload, onPreview, onDelete, isDownloading }: FileCardProps) {
   const isImage = file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
 
   return (
@@ -64,7 +65,7 @@ export function FileCard({ file, onDownload, onPreview, isDownloading }: FileCar
               Download
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem onClick={() => onDelete(file)} className="text-destructive">
               Excluir
             </DropdownMenuItem>
           </DropdownMenuContent>

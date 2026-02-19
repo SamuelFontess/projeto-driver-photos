@@ -13,6 +13,7 @@ interface FileGridProps {
   onFolderDelete: (folder: Folder) => void;
   onFileDownload: (file: FolderFile) => void;
   onFilePreview: (file: FolderFile) => void;
+  onFileDelete: (file: FolderFile) => void;
   downloadingFileId?: string | null;
 }
 
@@ -25,6 +26,7 @@ export function FileGrid({
   onFolderDelete,
   onFileDownload,
   onFilePreview,
+  onFileDelete,
   downloadingFileId,
 }: FileGridProps) {
   return (
@@ -57,6 +59,7 @@ export function FileGrid({
                 file={file}
                 onDownload={onFileDownload}
                 onPreview={onFilePreview}
+                onDelete={onFileDelete}
                 isDownloading={downloadingFileId === file.id}
               />
             ))}

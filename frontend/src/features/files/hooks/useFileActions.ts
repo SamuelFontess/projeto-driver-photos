@@ -6,10 +6,6 @@ import { useUpload } from '@/src/contexts/UploadContext';
 export function useUploadFiles() {
   const { uploadFiles } = useUpload();
   
-  // Wrap in useMutation to maintain compatibility with existing code structure
-  // or just return the function. But useMutation gives us isPending state which is useful.
-  // However, global state 'isUploading' might be better.
-  
   return useMutation({
     mutationFn: ({ files, folderId }: { files: File[]; folderId: string | null }) =>
       uploadFiles(files, folderId),
@@ -32,6 +28,60 @@ export function useDownloadFile() {
     onError: (error: Error) => {
       toast({
         title: 'Erro ao baixar arquivo',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useUpdateFile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; folderId?: string | null };
+    }) => api.updateFile(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      toast({
+        title: 'Arquivo atualizado',
+        description: 'O arquivo foi atualizado com sucesso.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao atualizar arquivo',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useDeleteFile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => api.deleteFile(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      toast({
+        title: 'Arquivo excluído',
+        description: 'O arquivo foi excluído com sucesso.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao excluir arquivo',
         description: error.message,
         variant: 'destructive',
       });

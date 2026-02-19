@@ -5,6 +5,11 @@ import type { FolderFile } from './folders';
 
 export type { FolderFile };
 
+export interface UpdateFilePayload {
+  name?: string;
+  folderId?: string | null;
+}
+
 export async function getFiles(
   folderId?: string | null
 ): Promise<{ files: FolderFile[] }> {
@@ -58,4 +63,26 @@ export async function downloadFile(
   id: string
 ): Promise<{ blob: Blob; filename?: string }> {
   return requestBlob(`/api/files/${encodeURIComponent(id)}/download`);
+}
+
+export async function getFile(id: string): Promise<{ file: FolderFile }> {
+  return request<{ file: FolderFile }>(`/api/files/${encodeURIComponent(id)}`, {
+    method: 'GET',
+  });
+}
+
+export async function updateFile(
+  id: string,
+  data: UpdateFilePayload
+): Promise<{ file: FolderFile }> {
+  return request<{ file: FolderFile }>(`/api/files/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteFile(id: string): Promise<void> {
+  await request<void>(`/api/files/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }

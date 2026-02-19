@@ -154,3 +154,148 @@ export async function download(req: Request, res: Response): Promise<void> {
     }
   }
 }
+
+export async function get(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const file = await prisma.file.findFirst({
+      where: { id, userId },
+      select: CAMPOS_ARQUIVO,
+    });
+
+    if (!file) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    res.json({ file });
+  } catch (error) {
+    console.error('File get error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function update(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { name, folderId } = req.body as {
+      name?: string;
+      folderId?: string | null;
+    };
+
+    const file = await prisma.file.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+
+    if (!file) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    const updateData: { name?: string; folderId?: string | null } = {};
+
+    if (name !== undefined) {
+      if (typeof name !== 'string') {
+        res.status(400).json({ error: 'Name must be a string' });
+        return;
+      }
+
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        res.status(400).json({ error: 'Name cannot be empty' });
+        return;
+      }
+
+      updateData.name = trimmedName;
+    }
+
+    if (folderId !== undefined) {
+      const nextFolderId = folderId === '' || folderId === null ? null : folderId;
+
+      if (nextFolderId !== null) {
+        const folder = await prisma.folder.findFirst({
+          where: { id: nextFolderId, userId },
+          select: { id: true },
+        });
+
+        if (!folder) {
+          res.status(404).json({ error: 'Folder not found' });
+          return;
+        }
+      }
+
+      updateData.folderId = nextFolderId;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ error: 'No fields to update' });
+      return;
+    }
+
+    const updatedFile = await prisma.file.update({
+      where: { id },
+      data: updateData,
+      select: CAMPOS_ARQUIVO,
+    });
+
+    res.json({ file: updatedFile });
+  } catch (error) {
+    console.error('File update error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function remove(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const file = await prisma.file.findFirst({
+      where: { id, userId },
+      select: { id: true, path: true },
+    });
+
+    if (!file) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    const absolutePath = path.join(PASTA_UPLOAD, file.path);
+    try {
+      await fs.promises.unlink(absolutePath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'ENOENT') {
+        console.error('File delete from disk error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+        return;
+      }
+    }
+
+    await prisma.file.delete({
+      where: { id: file.id },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('File remove error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}

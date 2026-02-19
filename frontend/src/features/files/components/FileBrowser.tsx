@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useFiles } from '../hooks/useFiles';
 import { useFolders } from '../hooks/useFolders';
 import { useCreateFolder, useUpdateFolder, useDeleteFolder } from '../hooks/useFolderActions';
-import { useUploadFiles, useDownloadFile } from '../hooks/useFileActions';
+import { useUploadFiles, useDownloadFile, useDeleteFile } from '../hooks/useFileActions';
 import { FileActions } from './FileActions';
 import { BreadcrumbNav } from './BreadcrumbNav';
 import { FileGrid } from './FileGrid';
@@ -59,6 +59,7 @@ export function FileBrowser() {
   const [moveFolderId, setMoveFolderId] = useState<string | null>(null);
   const [moveTargetParentId, setMoveTargetParentId] = useState<string | null>(null);
   const [deleteFolderId, setDeleteFolderId] = useState<string | null>(null);
+  const [deleteFileId, setDeleteFileId] = useState<string | null>(null);
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const [previewFile, setPreviewFile] = useState<FolderFile | null>(null);
   
@@ -72,6 +73,7 @@ export function FileBrowser() {
   const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
+  const deleteFile = useDeleteFile();
   const uploadFiles = useUploadFiles();
   const downloadFile = useDownloadFile();
   const { toast } = useToast();
@@ -222,6 +224,10 @@ export function FileBrowser() {
     setDeleteFolderId(folder.id);
   }, []);
 
+  const handleFileDelete = useCallback((file: FolderFile) => {
+    setDeleteFileId(file.id);
+  }, []);
+
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteFolderId) return;
     await deleteFolder.mutateAsync(deleteFolderId);
@@ -230,6 +236,15 @@ export function FileBrowser() {
     }
     setDeleteFolderId(null);
   }, [deleteFolderId, deleteFolder, currentFolderId, router]);
+
+  const handleConfirmFileDelete = useCallback(async () => {
+    if (!deleteFileId) return;
+    await deleteFile.mutateAsync(deleteFileId);
+    if (previewFile?.id === deleteFileId) {
+      setPreviewFile(null);
+    }
+    setDeleteFileId(null);
+  }, [deleteFileId, deleteFile, previewFile]);
 
   const getAvailableFolders = useCallback(
     (excludeId: string): Folder[] => {
@@ -307,6 +322,7 @@ export function FileBrowser() {
                     onFolderDelete={handleDelete}
                     onFileDownload={handleDownload}
                     onFilePreview={handlePreview}
+                    onFileDelete={handleFileDelete}
                     downloadingFileId={downloadFile.isPending ? 'pending' : null}
                   />
                 ) : (
@@ -319,6 +335,7 @@ export function FileBrowser() {
                     onFolderDelete={handleDelete}
                     onFileDownload={handleDownload}
                     onFilePreview={handlePreview}
+                    onFileDelete={handleFileDelete}
                     downloadingFileId={downloadFile.isPending ? 'pending' : null}
                   />
                 )}
@@ -420,6 +437,27 @@ export function FileBrowser() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteFolder.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete File Alert */}
+      <AlertDialog open={!!deleteFileId} onOpenChange={(open) => !open && setDeleteFileId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir arquivo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmFileDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteFile.isPending ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

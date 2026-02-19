@@ -21,6 +21,7 @@ export type {
 } from './folders';
 
 export { type FolderFile as FileItem } from './files';
+export type { UpdateFilePayload } from './files';
 
 const api = {
   register: auth.register,
@@ -33,6 +34,9 @@ const api = {
   getFolder: folders.getFolder,
   deleteFolder: folders.deleteFolder,
   getFiles: files.getFiles,
+  getFile: files.getFile,
+  updateFile: files.updateFile,
+  deleteFile: files.deleteFile,
   uploadFile: files.uploadFile,
   uploadFiles: files.uploadFiles,
   downloadFile: files.downloadFile,

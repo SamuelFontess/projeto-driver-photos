@@ -21,6 +21,7 @@ interface FileListProps {
   onFolderDelete: (folder: FolderType) => void;
   onFileDownload: (file: FolderFile) => void;
   onFilePreview: (file: FolderFile) => void;
+  onFileDelete: (file: FolderFile) => void;
   downloadingFileId?: string | null;
 }
 
@@ -33,6 +34,7 @@ export function FileList({
   onFolderDelete,
   onFileDownload,
   onFilePreview,
+  onFileDelete,
   downloadingFileId,
 }: FileListProps) {
   return (
@@ -136,7 +138,10 @@ export function FileList({
                       Download
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      onClick={() => onFileDelete(file)}
+                      className="text-destructive"
+                    >
                       Excluir
                     </DropdownMenuItem>
                   </DropdownMenuContent>
