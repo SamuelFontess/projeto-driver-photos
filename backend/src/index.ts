@@ -4,27 +4,38 @@ import path from 'path';
 
 const envArg = process.argv.find((arg) => arg.startsWith('--env-file='));
 const envFileFromArg = envArg?.replace('--env-file=', '').trim();
-
-if (!envFileFromArg) {
-  throw new Error(
-    'Missing required --env-file argument. Use npm run dev (for .env.local) or npm run start (for .env).'
-  );
-}
-
-const envFileName = envFileFromArg;
 const backendRootPath = path.resolve(__dirname, '..');
-const envFilePath = path.resolve(backendRootPath, envFileName);
+let loadedEnvFileName: string | null = null;
 
-if (!fs.existsSync(envFilePath)) {
-  throw new Error(
-    `Missing required environment file: ${envFileName}. ` +
-      `Create ${envFileName} in backend/ before starting the server.`
-  );
-}
+if (envFileFromArg) {
+  const envFilePath = path.resolve(backendRootPath, envFileFromArg);
+  if (!fs.existsSync(envFilePath)) {
+    throw new Error(
+      `Missing required environment file: ${envFileFromArg}. ` +
+        `Create ${envFileFromArg} in backend/ before starting the server.`
+    );
+  }
 
-const dotenvResult = dotenv.config({ path: envFilePath });
-if (dotenvResult.error) {
-  throw dotenvResult.error;
+  const dotenvResult = dotenv.config({ path: envFilePath });
+  if (dotenvResult.error) {
+    throw dotenvResult.error;
+  }
+  loadedEnvFileName = envFileFromArg;
+} else {
+  const fallbackEnvFiles = ['.env.local', '.env'];
+  for (const fileName of fallbackEnvFiles) {
+    const fallbackPath = path.resolve(backendRootPath, fileName);
+    if (!fs.existsSync(fallbackPath)) {
+      continue;
+    }
+
+    const dotenvResult = dotenv.config({ path: fallbackPath });
+    if (dotenvResult.error) {
+      throw dotenvResult.error;
+    }
+    loadedEnvFileName = fileName;
+    break;
+  }
 }
 
 async function bootstrap() {
@@ -36,7 +47,11 @@ async function bootstrap() {
   const PORT = process.env.PORT || 3000;
   if (require.main === module) {
     app.listen(PORT, () => {
-      console.log(`Loaded environment from ${envFileName}`);
+      if (loadedEnvFileName) {
+        console.log(`Loaded environment from ${loadedEnvFileName}`);
+      } else {
+        console.log('No local .env file found. Using process environment variables.');
+      }
       console.log(`Server is running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
       console.log(`Auth routes: http://localhost:${PORT}/api/auth`);
