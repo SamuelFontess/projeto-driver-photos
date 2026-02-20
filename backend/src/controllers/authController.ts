@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
+import { createAuditLog } from '../lib/auditLog';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -53,6 +54,15 @@ export async function register(req: Request, res: Response): Promise<void> {
       email: user.email,
     });
 
+    await createAuditLog({
+      req,
+      action: 'auth.register',
+      resourceType: 'user',
+      resourceId: user.id,
+      userId: user.id,
+      metadata: { email: user.email },
+    });
+
     res.status(201).json({
       message: 'User created successfully',
       user,
@@ -96,6 +106,15 @@ export async function login(req: Request, res: Response): Promise<void> {
     const token = generateToken({
       userId: user.id,
       email: user.email,
+    });
+
+    await createAuditLog({
+      req,
+      action: 'auth.login',
+      resourceType: 'auth',
+      resourceId: user.id,
+      userId: user.id,
+      metadata: { email: user.email },
     });
 
     res.json({
@@ -241,6 +260,17 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
         name: true,
         createdAt: true,
         updatedAt: true,
+      },
+    });
+
+    await createAuditLog({
+      req,
+      action: 'user.profile.update',
+      resourceType: 'user',
+      resourceId: updatedUser.id,
+      userId: updatedUser.id,
+      metadata: {
+        updatedFields: Object.keys(updateData),
       },
     });
 

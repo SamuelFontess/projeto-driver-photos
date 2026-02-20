@@ -74,6 +74,11 @@ export async function downloadFile(
   return requestBlob(`/api/files/${encodeURIComponent(id)}/download`);
 }
 
+export async function getFilePreviewBlob(id: string): Promise<Blob> {
+  const { blob } = await requestBlob(`/api/files/${encodeURIComponent(id)}/preview`);
+  return blob;
+}
+
 export async function getFile(id: string): Promise<{ file: FolderFile }> {
   return request<{ file: FolderFile }>(`/api/files/${encodeURIComponent(id)}`, {
     method: 'GET',

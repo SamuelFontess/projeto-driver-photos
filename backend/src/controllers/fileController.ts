@@ -5,6 +5,13 @@ import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { PASTA_UPLOAD } from '../lib/uploads';
 import { isAllowedUploadMimeType, max_upload_file_size_bytes } from '../lib/multer';
+import { createAuditLog } from '../lib/auditLog';
+import {
+  getPreviewFromCache,
+  previewCacheMaxBytes,
+  previewMaxBytes,
+  setPreviewInCache,
+} from '../lib/redis';
 
 const CAMPOS_ARQUIVO = {
   id: true,
@@ -147,6 +154,23 @@ export async function upload(req: Request, res: Response): Promise<void> {
       created.push(record);
     }
 
+    await Promise.all(
+      created.map((record) =>
+        createAuditLog({
+          req,
+          action: 'file.upload',
+          resourceType: 'file',
+          resourceId: record.id,
+          metadata: {
+            name: record.name,
+            folderId: record.folderId,
+            size: record.size,
+            mimeType: record.mimeType,
+          },
+        })
+      )
+    );
+
     res.status(201).json({ files: created });
   } catch (error) {
     logger.error('File upload error', error);
@@ -189,6 +213,17 @@ export async function download(req: Request, res: Response): Promise<void> {
     );
 
     const stream = fs.createReadStream(absolutePath);
+    await createAuditLog({
+      req,
+      action: 'file.download',
+      resourceType: 'file',
+      resourceId: id,
+      metadata: {
+        mimeType: fileRecord.mimeType,
+        name: fileRecord.name,
+      },
+    });
+
     stream.on('error', (err) => {
       logger.error('File stream error', err);
       if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
@@ -197,6 +232,126 @@ export async function download(req: Request, res: Response): Promise<void> {
     stream.pipe(res);
   } catch (error) {
     logger.error('File download error', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+}
+
+function getPreviewCacheKey(fileId: string): string {
+  return `preview:file:${fileId}:v1`;
+}
+
+function setPreviewHeaders(res: Response, fileName: string, mimeType: string, size: number): void {
+  const safeName = fileName.replace(/[^\x20-\x7E]/g, '_');
+  res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+  res.setHeader('Content-Length', String(size));
+  res.setHeader(
+    'Content-Disposition',
+    `inline; filename="${safeName.replace(/"/g, '\\"')}"`
+  );
+  res.setHeader('Cache-Control', 'private, max-age=300');
+}
+
+export async function preview(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const fileRecord = await prisma.file.findFirst({
+      where: { id, userId },
+      select: { id: true, path: true, name: true, mimeType: true, size: true },
+    });
+
+    if (!fileRecord) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    if (fileRecord.size > previewMaxBytes) {
+      res.status(413).json({ error: 'File too large for preview' });
+      return;
+    }
+
+    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
+    if (!fs.existsSync(absolutePath)) {
+      logger.warn('Preview file on disk missing', { path: absolutePath, fileId: fileRecord.id });
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    const mimeType = fileRecord.mimeType || 'application/octet-stream';
+    const cacheKey = getPreviewCacheKey(fileRecord.id);
+    const cached = await getPreviewFromCache(cacheKey);
+
+    if (cached) {
+      await createAuditLog({
+        req,
+        action: 'file.preview',
+        resourceType: 'file',
+        resourceId: fileRecord.id,
+        metadata: {
+          source: 'redis',
+          size: cached.length,
+          mimeType,
+        },
+      });
+      setPreviewHeaders(res, fileRecord.name, mimeType, cached.length);
+      res.end(cached);
+      return;
+    }
+
+    if (fileRecord.size <= previewCacheMaxBytes) {
+      try {
+        const fileBuffer = await fs.promises.readFile(absolutePath);
+        await setPreviewInCache(cacheKey, fileBuffer);
+        await createAuditLog({
+          req,
+          action: 'file.preview',
+          resourceType: 'file',
+          resourceId: fileRecord.id,
+          metadata: {
+            source: 'disk-buffer',
+            size: fileBuffer.length,
+            mimeType,
+          },
+        });
+        setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
+        res.end(fileBuffer);
+        return;
+      } catch (error) {
+        logger.warn('Preview readFile failed, fallback to stream', {
+          fileId: fileRecord.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
+    await createAuditLog({
+      req,
+      action: 'file.preview',
+      resourceType: 'file',
+      resourceId: fileRecord.id,
+      metadata: {
+        source: 'disk-stream',
+        size: fileRecord.size,
+        mimeType,
+      },
+    });
+    const stream = fs.createReadStream(absolutePath);
+    stream.on('error', (err) => {
+      logger.error('File preview stream error', err);
+      if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+      else res.end();
+    });
+    stream.pipe(res);
+  } catch (error) {
+    logger.error('File preview error', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -299,6 +454,18 @@ export async function update(req: Request, res: Response): Promise<void> {
       select: CAMPOS_ARQUIVO,
     });
 
+    await createAuditLog({
+      req,
+      action: 'file.update',
+      resourceType: 'file',
+      resourceId: updatedFile.id,
+      metadata: {
+        updatedFields: Object.keys(updateData),
+        name: updatedFile.name,
+        folderId: updatedFile.folderId,
+      },
+    });
+
     res.json({ file: updatedFile });
   } catch (error) {
     logger.error('File update error', error);
@@ -339,6 +506,16 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     await prisma.file.delete({
       where: { id: file.id },
+    });
+
+    await createAuditLog({
+      req,
+      action: 'file.delete',
+      resourceType: 'file',
+      resourceId: file.id,
+      metadata: {
+        path: file.path,
+      },
     });
 
     res.status(204).send();

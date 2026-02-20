@@ -40,6 +40,7 @@ const api = {
   uploadFile: files.uploadFile,
   uploadFiles: files.uploadFiles,
   downloadFile: files.downloadFile,
+  getFilePreviewBlob: files.getFilePreviewBlob,
 };
 
 export { api };

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
+import { createAuditLog } from '../lib/auditLog';
 
 // Lista pastas do usuário autenticado (query opcional parentId: omitido/null = raiz).
 export async function list(req: Request, res: Response): Promise<void> {
@@ -120,6 +121,17 @@ export async function create(req: Request, res: Response): Promise<void> {
         filesCount,
       },
     });
+
+    await createAuditLog({
+      req,
+      action: 'folder.create',
+      resourceType: 'folder',
+      resourceId: folder.id,
+      metadata: {
+        name: folder.name,
+        parentId: folder.parentId,
+      },
+    });
   } catch (error) {
     logger.error('Folder create error', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -200,6 +212,17 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     await prisma.folder.delete({
       where: { id },
+    });
+
+    await createAuditLog({
+      req,
+      action: 'folder.delete',
+      resourceType: 'folder',
+      resourceId: folder.id,
+      metadata: {
+        name: folder.name,
+        parentId: folder.parentId,
+      },
     });
 
     res.status(204).send();
@@ -353,6 +376,18 @@ export async function update(req: Request, res: Response): Promise<void> {
         ...updatedFolder,
         childrenCount,
         filesCount,
+      },
+    });
+
+    await createAuditLog({
+      req,
+      action: 'folder.update',
+      resourceType: 'folder',
+      resourceId: updatedFolder.id,
+      metadata: {
+        updatedFields: Object.keys(updateData),
+        parentId: updatedFolder.parentId,
+        name: updatedFolder.name,
       },
     });
   } catch (error) {

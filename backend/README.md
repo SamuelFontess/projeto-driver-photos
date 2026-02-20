@@ -6,6 +6,7 @@ Backend para sistema de armazenamento de arquivos tipo Google Drive.
 
 - Node.js (v18 ou superior)
 - PostgreSQL instalado e rodando
+- Redis (opcional para cache de preview de arquivos)
 - npm ou yarn
 
 ## Configuração Inicial
@@ -36,6 +37,22 @@ Substitua:
 - `localhost:5432`: host e porta do seu PostgreSQL (ajuste se necessário)
 
 3. Configure também o `JWT_SECRET` no `.env` com uma string segura (pode gerar uma aleatória).
+
+4. (Opcional) Configure Redis para cache de preview:
+
+```
+REDIS_URL="redis://localhost:6379"
+FILE_PREVIEW_CACHE_ENABLED=true
+FILE_PREVIEW_CACHE_TTL_SECONDS=3600
+FILE_PREVIEW_CACHE_MAX_BYTES=20971520
+FILE_PREVIEW_MAX_BYTES=52428800
+```
+
+Se preferir, suba um Redis local com Docker Compose na raiz do monorepo:
+
+```bash
+docker compose up -d redis
+```
 
 ### 3. Executar Migrations
 
@@ -91,7 +108,6 @@ backend/
 
 Após configurar o banco e executar as migrations:
 
-1. Implementar rotas de autenticação (registro/login)
-2. Implementar middleware de autenticação JWT
-3. Criar rotas para upload/download de arquivos
-4. Implementar sistema de pastas hierárquico
+1. Criar testes de integração para as rotas críticas
+2. Evoluir preview de arquivos com suporte a range/chunks para vídeos grandes
+3. Configurar observabilidade para logs e métricas
