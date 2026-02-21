@@ -8,6 +8,8 @@ import { files_request_limit, max_upload_file_size_bytes } from './lib/multer';
 
 export const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3001',

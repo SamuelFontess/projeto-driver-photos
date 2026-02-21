@@ -5,13 +5,12 @@ type RedisClient = {
   isReady: boolean;
   on(event: string, listener: (...args: unknown[]) => void): void;
   connect(): Promise<void>;
-  get(options: unknown, key: string): Promise<Buffer | null>;
-  set(key: string, value: Buffer, options: { EX: number }): Promise<void>;
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, options: { EX: number }): Promise<void>;
 };
 
 type RedisModule = {
   createClient(options: { url: string }): RedisClient;
-  commandOptions(options: { returnBuffers: boolean }): unknown;
 };
 
 function loadRedisModule(): RedisModule | null {
@@ -162,11 +161,9 @@ export async function getPreviewFromCache(cacheKey: string): Promise<Buffer | nu
   if (!client) return null;
 
   try {
-    const redis = loadRedisModule();
-    if (!redis) {
-      return null;
-    }
-    return await client.get(redis.commandOptions({ returnBuffers: true }), cacheKey);
+    const value = await client.get(cacheKey);
+    if (value == null) return null;
+    return Buffer.from(value, 'base64');
   } catch (error) {
     logger.warn('Preview cache read failed', {
       cacheKey,
@@ -181,7 +178,7 @@ export async function setPreviewInCache(cacheKey: string, value: Buffer): Promis
   if (!client) return;
 
   try {
-    await client.set(cacheKey, value, {
+    await client.set(cacheKey, value.toString('base64'), {
       EX: previewCacheTtlSeconds,
     });
   } catch (error) {
