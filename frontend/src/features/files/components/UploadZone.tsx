@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
 interface UploadZoneProps {

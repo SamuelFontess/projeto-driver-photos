@@ -21,8 +21,6 @@ interface FileCardProps {
 }
 
 export function FileCard({ file, onDownload, onPreview, onDelete, isDownloading }: FileCardProps) {
-  const isImage = file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-
   return (
     <div className="group relative flex items-center gap-4 rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors">
       <div 

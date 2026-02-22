@@ -9,6 +9,7 @@ import {
 import { Button } from '@/src/components/ui';
 import { type FolderFile } from '@/src/lib/api';
 import { Download, File as FileIcon, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/src/lib/api';
 import { useQuery } from '@tanstack/react-query';
@@ -129,7 +130,7 @@ export function FilePreviewModal({
           )}
           
           {!loading && !error && objectUrl && fileKind === 'image' && (
-            <img src={objectUrl} alt={file.name} className="max-w-full max-h-full object-contain" />
+            <Image src={objectUrl} alt={file.name} width={800} height={600} className="max-w-full max-h-full object-contain" unoptimized />
           )}
 
           {!loading && !error && objectUrl && fileKind === 'pdf' && (

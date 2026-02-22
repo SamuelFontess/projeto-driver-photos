@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '@/src/components/ui';
 import { Plus, Upload, Grid3x3, List } from 'lucide-react';
 import {

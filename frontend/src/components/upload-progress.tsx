@@ -1,9 +1,8 @@
 'use client';
 
 import { useUpload } from '@/src/contexts/UploadContext';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui';
 import { X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
 import { useState } from 'react';
 
 export function UploadProgress() {

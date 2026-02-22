@@ -71,7 +71,7 @@ export function FileBrowser() {
   const { data: filesData, isLoading: filesLoading } = useFiles(currentFolderId, normalizedSearchQuery);
   
   // Mutations
-  const createFolder = useCreateFolder();
+  useCreateFolder();
   const updateFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
   const deleteFile = useDeleteFile();
@@ -202,7 +202,7 @@ export function FileBrowser() {
     try {
       const { folders: all } = await api.getFolders(null);
       setAllFolders(all);
-    } catch (error) {
+    } catch {
       toast({
         title: 'Erro',
         description: 'Não foi possível carregar as pastas.',

@@ -33,7 +33,7 @@ export function useUpdateFolder() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: { name?: string; parentId?: string | null } }) =>
       api.updateFolder(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       toast({
         title: 'Pasta atualizada',

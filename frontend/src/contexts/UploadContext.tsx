@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api, type FolderFile } from '@/src/lib/api';
+import { api } from '@/src/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/src/hooks/use-toast';
 
