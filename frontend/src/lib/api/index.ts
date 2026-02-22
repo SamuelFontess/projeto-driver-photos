@@ -26,6 +26,7 @@ export type { UpdateFilePayload } from './files';
 const api = {
   register: auth.register,
   login: auth.login,
+  loginWithGoogle: auth.loginWithGoogle,
   getMe: auth.getMe,
   updateProfile: auth.updateProfile,
   getFolders: folders.getFolders,

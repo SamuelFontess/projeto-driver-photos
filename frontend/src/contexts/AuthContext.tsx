@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   authReady: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
@@ -69,6 +70,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logUxEvent('login_success', { durationMs: duration });
   };
 
+  const loginWithGoogle = async () => {
+    markUx('login-google-start');
+    const { signInWithGoogle } = await import('@/src/lib/firebase');
+    const idToken = await signInWithGoogle();
+    const response = await api.loginWithGoogle(idToken);
+    localStorage.setItem('token', response.token);
+    setToken(response.token);
+    setUser(response.user);
+    markUx('login-google-end');
+    const duration = measureUx('login-google-flow', 'login-google-start', 'login-google-end');
+    logUxEvent('login_google_success', { durationMs: duration });
+  };
+
   const register = async (email: string, password: string, name?: string) => {
     markUx('register-start');
     const response = await api.register({ email, password, name });
@@ -97,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     authReady,
     login,
+    loginWithGoogle,
     register,
     logout,
     updateUser,

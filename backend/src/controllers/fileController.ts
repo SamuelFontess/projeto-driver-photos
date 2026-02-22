@@ -1,17 +1,27 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { PASTA_UPLOAD } from '../lib/uploads';
 import { isAllowedUploadMimeType, max_upload_file_size_bytes } from '../lib/multer';
 import { createAuditLog } from '../lib/auditLog';
+import { getFirebaseBucket } from '../lib/firebase';
 import {
   getPreviewFromCache,
   previewCacheMaxBytes,
   previewMaxBytes,
   setPreviewInCache,
 } from '../lib/redis';
+
+function isStoragePath(filePath: string): boolean {
+  return filePath.startsWith('users/');
+}
+
+function sanitizeStorageName(name: string): string {
+  return (name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').trim() || 'file';
+}
 
 const CAMPOS_ARQUIVO = {
   id: true,
@@ -23,20 +33,19 @@ const CAMPOS_ARQUIVO = {
   updatedAt: true,
 } as const;
 
-async function cleanupUploadedFiles(files: Express.Multer.File[]): Promise<void> {
-  await Promise.all(
-    files.map(async (file) => {
-      if (!file.path) return;
-      try {
-        await fs.promises.unlink(file.path);
-      } catch (error) {
-        const err = error as NodeJS.ErrnoException;
-        if (err.code !== 'ENOENT') {
-          logger.warn('Failed to cleanup uploaded file', { path: file.path, error: err.message });
-        }
-      }
-    })
-  );
+async function writeBufferToDisk(
+  userId: string,
+  buffer: Buffer,
+  filename: string
+): Promise<string> {
+  const userDir = path.join(PASTA_UPLOAD, userId);
+  if (!fs.existsSync(userDir)) {
+    fs.mkdirSync(userDir, { recursive: true });
+  }
+  const relativePath = path.join(userId, filename);
+  const absolutePath = path.join(PASTA_UPLOAD, relativePath);
+  await fs.promises.writeFile(absolutePath, buffer);
+  return relativePath;
 }
 
 export async function list(req: Request, res: Response): Promise<void> {
@@ -96,7 +105,6 @@ export async function upload(req: Request, res: Response): Promise<void> {
 
     const invalidMimeFile = files.find((file) => !isAllowedUploadMimeType(file.mimetype));
     if (invalidMimeFile) {
-      await cleanupUploadedFiles(files);
       res
         .status(400)
         .json({ error: `File type not allowed: ${invalidMimeFile.mimetype || 'unknown'}` });
@@ -105,7 +113,6 @@ export async function upload(req: Request, res: Response): Promise<void> {
 
     const oversizedFile = files.find((file) => file.size > max_upload_file_size_bytes);
     if (oversizedFile) {
-      await cleanupUploadedFiles(files);
       res
         .status(400)
         .json({ error: `File too large (max ${Math.floor(max_upload_file_size_bytes / (1024 * 1024))} MB)` });
@@ -125,6 +132,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
       folderId = folderIdParam;
     }
 
+    const bucket = getFirebaseBucket();
     const created: Array<{
       id: string;
       name: string;
@@ -139,13 +147,36 @@ export async function upload(req: Request, res: Response): Promise<void> {
       const name = (file.originalname || 'file').trim();
       if (!name) continue;
 
-      const relativePath = path.join(userId, file.filename);
+      const fileId = randomUUID();
+      const mimeType = file.mimetype || 'application/octet-stream';
+      const buffer = file.buffer;
+      if (!buffer) {
+        logger.warn('Upload file missing buffer', { originalname: file.originalname });
+        continue;
+      }
+
+      let filePath: string;
+
+      if (bucket) {
+        const sanitizedName = sanitizeStorageName(name);
+        filePath = `users/${userId}/${fileId}-${sanitizedName}`;
+        const storageFile = bucket.file(filePath);
+        await storageFile.save(buffer, {
+          metadata: { contentType: mimeType },
+        });
+      } else {
+        const sanitized = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const diskFilename = `${fileId}-${sanitized}`;
+        filePath = await writeBufferToDisk(userId, buffer, diskFilename);
+      }
+
       const record = await prisma.file.create({
         data: {
+          id: fileId,
           name,
-          path: relativePath,
+          path: filePath,
           size: file.size,
-          mimeType: file.mimetype || 'application/octet-stream',
+          mimeType,
           userId,
           folderId,
         },
@@ -198,13 +229,6 @@ export async function download(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
-    if (!fs.existsSync(absolutePath)) {
-      logger.warn('File on disk missing', { path: absolutePath });
-      res.status(404).json({ error: 'File not found' });
-      return;
-    }
-
     const safeName = fileRecord.name.replace(/[^\x20-\x7E]/g, '_');
     res.setHeader('Content-Type', fileRecord.mimeType);
     res.setHeader(
@@ -212,7 +236,6 @@ export async function download(req: Request, res: Response): Promise<void> {
       `attachment; filename="${safeName.replace(/"/g, '\\"')}"`
     );
 
-    const stream = fs.createReadStream(absolutePath);
     await createAuditLog({
       req,
       action: 'file.download',
@@ -224,6 +247,30 @@ export async function download(req: Request, res: Response): Promise<void> {
       },
     });
 
+    if (isStoragePath(fileRecord.path)) {
+      const bucket = getFirebaseBucket();
+      if (!bucket) {
+        res.status(503).json({ error: 'Storage unavailable' });
+        return;
+      }
+      const readStream = bucket.file(fileRecord.path).createReadStream();
+      readStream.on('error', (err) => {
+        logger.error('File stream error', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+        else res.end();
+      });
+      readStream.pipe(res);
+      return;
+    }
+
+    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
+    if (!fs.existsSync(absolutePath)) {
+      logger.warn('File on disk missing', { path: absolutePath });
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    const stream = fs.createReadStream(absolutePath);
     stream.on('error', (err) => {
       logger.error('File stream error', err);
       if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
@@ -277,13 +324,6 @@ export async function preview(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
-    if (!fs.existsSync(absolutePath)) {
-      logger.warn('Preview file on disk missing', { path: absolutePath, fileId: fileRecord.id });
-      res.status(404).json({ error: 'File not found' });
-      return;
-    }
-
     const mimeType = fileRecord.mimeType || 'application/octet-stream';
     const cacheKey = getPreviewCacheKey(fileRecord.id);
     const cached = await getPreviewFromCache(cacheKey);
@@ -302,6 +342,67 @@ export async function preview(req: Request, res: Response): Promise<void> {
       });
       setPreviewHeaders(res, fileRecord.name, mimeType, cached.length);
       res.end(cached);
+      return;
+    }
+
+    if (isStoragePath(fileRecord.path)) {
+      const bucket = getFirebaseBucket();
+      if (!bucket) {
+        res.status(503).json({ error: 'Storage unavailable' });
+        return;
+      }
+      const storageFile = bucket.file(fileRecord.path);
+      if (fileRecord.size <= previewCacheMaxBytes) {
+        try {
+          const [fileBuffer] = await storageFile.download();
+          await setPreviewInCache(cacheKey, fileBuffer);
+          await createAuditLog({
+            req,
+            action: 'file.preview',
+            resourceType: 'file',
+            resourceId: fileRecord.id,
+            metadata: {
+              source: 'storage-buffer',
+              size: fileBuffer.length,
+              mimeType,
+            },
+          });
+          setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
+          res.end(fileBuffer);
+          return;
+        } catch (error) {
+          logger.warn('Preview Storage download failed, fallback to stream', {
+            fileId: fileRecord.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
+      await createAuditLog({
+        req,
+        action: 'file.preview',
+        resourceType: 'file',
+        resourceId: fileRecord.id,
+        metadata: {
+          source: 'storage-stream',
+          size: fileRecord.size,
+          mimeType,
+        },
+      });
+      const readStream = storageFile.createReadStream();
+      readStream.on('error', (err) => {
+        logger.error('File preview stream error', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+        else res.end();
+      });
+      readStream.pipe(res);
+      return;
+    }
+
+    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
+    if (!fs.existsSync(absolutePath)) {
+      logger.warn('Preview file on disk missing', { path: absolutePath, fileId: fileRecord.id });
+      res.status(404).json({ error: 'File not found' });
       return;
     }
 
@@ -492,15 +593,31 @@ export async function remove(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const absolutePath = path.join(PASTA_UPLOAD, file.path);
-    try {
-      await fs.promises.unlink(absolutePath);
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT') {
-        logger.error('File delete from disk error', err);
-        res.status(500).json({ error: 'Internal server error' });
-        return;
+    if (isStoragePath(file.path)) {
+      const bucket = getFirebaseBucket();
+      if (bucket) {
+        try {
+          await bucket.file(file.path).delete();
+        } catch (error) {
+          const err = error as { code?: number };
+          if (err.code !== 404) {
+            logger.error('File delete from Storage error', error);
+            res.status(500).json({ error: 'Internal server error' });
+            return;
+          }
+        }
+      }
+    } else {
+      const absolutePath = path.join(PASTA_UPLOAD, file.path);
+      try {
+        await fs.promises.unlink(absolutePath);
+      } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        if (err.code !== 'ENOENT') {
+          logger.error('File delete from disk error', err);
+          res.status(500).json({ error: 'Internal server error' });
+          return;
+        }
       }
     }
 

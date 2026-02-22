@@ -4,6 +4,8 @@ import { logger } from '../lib/logger';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { createAuditLog } from '../lib/auditLog';
+import { initFirebase } from '../lib/firebase';
+import * as admin from 'firebase-admin';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -94,9 +96,12 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Verificar senha
-    const isPasswordValid = await comparePassword(password, user.password);
+    if (user.password === null) {
+      res.status(401).json({ error: 'Use Google to sign in with this account' });
+      return;
+    }
 
+    const isPasswordValid = await comparePassword(password, user.password);
     if (!isPasswordValid) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
@@ -128,6 +133,87 @@ export async function login(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     logger.error('Login error', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function googleAuth(req: Request, res: Response): Promise<void> {
+  try {
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken || typeof idToken !== 'string') {
+      res.status(400).json({ error: 'idToken is required' });
+      return;
+    }
+
+    initFirebase();
+    const auth = admin.auth();
+    let decoded: admin.auth.DecodedIdToken;
+    try {
+      decoded = await auth.verifyIdToken(idToken);
+    } catch (error) {
+      logger.warn('Google idToken verification failed', error);
+      res.status(401).json({ error: 'Invalid or expired Google token' });
+      return;
+    }
+
+    const { uid, email, name } = decoded;
+    if (!email) {
+      res.status(400).json({ error: 'Google account has no email' });
+      return;
+    }
+
+    type UserShape = { id: string; email: string; name: string | null };
+    let user: UserShape | null = await prisma.user.findFirst({
+      where: { firebaseUid: uid },
+      select: { id: true, email: true, name: true },
+    });
+
+    if (!user) {
+      user = await prisma.user.findFirst({
+        where: { email },
+        select: { id: true, email: true, name: true },
+      });
+      if (user) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { firebaseUid: uid },
+        });
+      }
+    }
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: name || null,
+          firebaseUid: uid,
+          password: null,
+        },
+        select: { id: true, email: true, name: true },
+      });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+    });
+
+    await createAuditLog({
+      req,
+      action: 'auth.google',
+      resourceType: 'auth',
+      resourceId: user.id,
+      userId: user.id,
+      metadata: { email: user.email },
+    });
+
+    res.json({
+      message: 'Login successful',
+      user: { id: user.id, email: user.email, name: user.name },
+      token,
+    });
+  } catch (error) {
+    logger.error('Google auth error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -222,25 +308,23 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
       updateData.email = trimmedEmail;
     }
 
-    // Atualiza senha se fornecida
+    // Atualiza senha se fornecida (usuários só-Google podem definir senha pela primeira vez)
     if (newPassword !== undefined) {
-      if (!currentPassword) {
-        res.status(400).json({ error: 'Current password is required to change password' });
-        return;
-      }
       if (typeof newPassword !== 'string' || newPassword.length < 6) {
         res.status(400).json({ error: 'New password must be at least 6 characters' });
         return;
       }
-      
-      // Valida senha atual
-      const isPasswordValid = await comparePassword(currentPassword, currentUser.password);
-      if (!isPasswordValid) {
-        res.status(401).json({ error: 'Current password is incorrect' });
-        return;
+      if (currentUser.password !== null) {
+        if (!currentPassword) {
+          res.status(400).json({ error: 'Current password is required to change password' });
+          return;
+        }
+        const isPasswordValid = await comparePassword(currentPassword, currentUser.password);
+        if (!isPasswordValid) {
+          res.status(401).json({ error: 'Current password is incorrect' });
+          return;
+        }
       }
-      
-      // Hash da nova senha
       updateData.password = await hashPassword(newPassword);
     }
 

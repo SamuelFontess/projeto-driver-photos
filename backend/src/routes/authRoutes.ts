@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { register, login, me, updateProfile } from '../controllers/authController';
+import { register, login, googleAuth, me, updateProfile } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
-import { loginSchema, registerSchema, updateProfileSchema } from '../validation/authSchemas';
+import { loginSchema, registerSchema, updateProfileSchema, googleAuthSchema } from '../validation/authSchemas';
 import { authRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
@@ -12,6 +12,7 @@ router.use(authRateLimiter);
 // Rotas públicas
 router.post('/register', validate(registerSchema), register);
 router.post('/login', validate(loginSchema), login);
+router.post('/google', validate(googleAuthSchema), googleAuth);
 
 // Rotas protegidas (requerem autenticação)
 router.get('/me', authenticate, me);

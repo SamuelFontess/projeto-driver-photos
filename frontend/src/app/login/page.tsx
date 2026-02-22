@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,11 +11,14 @@ import { Button, Input, Label } from '@/src/components/ui';
 import Link from 'next/link';
 import { useToast } from '@/src/hooks/use-toast';
 import { Loader2, HardDrive } from 'lucide-react';
+import { isFirebaseAuthEnabled } from '@/src/lib/firebase';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const showGoogleLogin = isFirebaseAuthEnabled();
 
   const {
     register,
@@ -100,6 +104,53 @@ export default function LoginPage() {
                 'Entrar'
               )}
             </Button>
+
+            {showGoogleLogin && (
+              <>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">ou</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12"
+                  disabled={googleLoading}
+                  onClick={async () => {
+                    setGoogleLoading(true);
+                    try {
+                      await loginWithGoogle();
+                      toast({
+                        title: 'Login realizado com sucesso!',
+                        description: 'Redirecionando...',
+                      });
+                      router.push('/dashboard');
+                    } catch (err: unknown) {
+                      toast({
+                        title: 'Erro ao entrar com Google',
+                        description: err instanceof Error ? err.message : 'Tente novamente',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setGoogleLoading(false);
+                    }
+                  }}
+                >
+                  {googleLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Entrando...
+                    </>
+                  ) : (
+                    'Entrar com Google'
+                  )}
+                </Button>
+              </>
+            )}
           </form>
 
           <p className="text-center text-sm text-muted-foreground">

@@ -40,9 +40,11 @@ if (envFileFromArg) {
 
 async function bootstrap() {
   const { ensureUploadDir } = await import('./lib/uploads');
+  const { initFirebase } = await import('./lib/firebase');
   const { app } = await import('./app');
 
   ensureUploadDir();
+  initFirebase();
 
   const PORT = process.env.PORT || 3000;
   if (require.main === module) {

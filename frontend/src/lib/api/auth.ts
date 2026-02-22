@@ -45,6 +45,13 @@ export async function login(data: LoginData): Promise<AuthResponse> {
   });
 }
 
+export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ idToken }),
+  });
+}
+
 export async function getMe(): Promise<{ user: User }> {
   return request<{ user: User }>('/api/auth/me', { method: 'GET' });
 }

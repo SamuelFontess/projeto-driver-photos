@@ -1,9 +1,5 @@
-import path from 'path';
-import fs from 'fs';
 import multer from 'multer';
 import { Request } from 'express';
-import { randomUUID } from 'crypto';
-import { PASTA_UPLOAD } from './uploads';
 
 const DEFAULT_MAX_UPLOAD_FILE_SIZE_MB = 10;
 const parsedMaxUploadFileSizeMb = Number(process.env.UPLOAD_MAX_FILE_SIZE_MB);
@@ -46,33 +42,10 @@ function fileFilter(
   cb(new Error(`File type not allowed: ${file.mimetype}`));
 }
 
-// diskStorage grava em PASTA_UPLOAD/{userId}/{uuid}-{nome}
-
-const armazenamento_disco = multer.diskStorage({
-  destination(req: Request, _file, cb) {
-    const userId = req.user?.userId;
-    if (!userId) {
-      cb(new Error('User not authenticated'), '');
-      return;
-    }
-    const userDir = path.join(PASTA_UPLOAD, userId);
-    if (!fs.existsSync(userDir)) {
-      fs.mkdirSync(userDir, { recursive: true });
-    }
-    cb(null, userDir);
-  },
-  filename(_req, file, cb) {
-    const uuid = randomUUID();
-    const sanitized = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${uuid}-${sanitized}`);
-  },
-});
-
-// Middleware de upload; usar após authenticate, limite por arquivo configurável
 export const files_request_limit = 20;
 
 export const singleFile = multer({
-  storage: armazenamento_disco,
+  storage: multer.memoryStorage(),
   limits: { fileSize: max_upload_file_size_bytes },
   fileFilter,
 });
