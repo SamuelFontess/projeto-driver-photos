@@ -6,6 +6,7 @@ import {
   createFolderSchema,
   folderIdParamSchema,
   folderListQuerySchema,
+  folderScopeQuerySchema,
   updateFolderSchema,
 } from '../validation/folderSchemas';
 
@@ -14,8 +15,27 @@ const router = Router();
 // Todas as rotas de pastas exigem autenticação
 router.get('/', authenticate, validate(folderListQuerySchema, 'query'), list);
 router.post('/', authenticate, validate(createFolderSchema), create);
-router.get('/:id', authenticate, validate(folderIdParamSchema, 'params'), get);
-router.patch('/:id', authenticate, validate(folderIdParamSchema, 'params'), validate(updateFolderSchema), update);
-router.delete('/:id', authenticate, validate(folderIdParamSchema, 'params'), remove);
+router.get(
+  '/:id',
+  authenticate,
+  validate(folderIdParamSchema, 'params'),
+  validate(folderScopeQuerySchema, 'query'),
+  get
+);
+router.patch(
+  '/:id',
+  authenticate,
+  validate(folderIdParamSchema, 'params'),
+  validate(folderScopeQuerySchema, 'query'),
+  validate(updateFolderSchema),
+  update
+);
+router.delete(
+  '/:id',
+  authenticate,
+  validate(folderIdParamSchema, 'params'),
+  validate(folderScopeQuerySchema, 'query'),
+  remove
+);
 
 export default router;

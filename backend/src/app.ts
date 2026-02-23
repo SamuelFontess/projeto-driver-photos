@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
 import fileRoutes from './routes/fileRoutes';
+import familyRoutes from './routes/familyRoutes';
 import { logger } from './lib/logger';
 import { files_request_limit, max_upload_file_size_bytes } from './lib/multer';
 
@@ -23,6 +24,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/families', familyRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/files', fileRoutes);
 

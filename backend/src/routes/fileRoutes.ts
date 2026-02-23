@@ -6,6 +6,7 @@ import { validate } from '../middleware/validate';
 import {
   fileIdParamSchema,
   listFilesQuerySchema,
+  fileScopeQuerySchema,
   updateFileSchema,
   uploadFilesBodySchema,
 } from '../validation/fileSchemas';
@@ -27,12 +28,43 @@ router.post(
 );
 
 // Download pelo id do arquivo
-router.get('/:id/download', authenticate, validate(fileIdParamSchema, 'params'), download);
-router.get('/:id/preview', authenticate, validate(fileIdParamSchema, 'params'), preview);
+router.get(
+  '/:id/download',
+  authenticate,
+  validate(fileIdParamSchema, 'params'),
+  validate(fileScopeQuerySchema, 'query'),
+  download
+);
+router.get(
+  '/:id/preview',
+  authenticate,
+  validate(fileIdParamSchema, 'params'),
+  validate(fileScopeQuerySchema, 'query'),
+  preview
+);
 
 // CRUD por id (ordem após /download e /preview para evitar conflito de rota)
-router.get('/:id', authenticate, validate(fileIdParamSchema, 'params'), get);
-router.patch('/:id', authenticate, validate(fileIdParamSchema, 'params'), validate(updateFileSchema), update);
-router.delete('/:id', authenticate, validate(fileIdParamSchema, 'params'), remove);
+router.get(
+  '/:id',
+  authenticate,
+  validate(fileIdParamSchema, 'params'),
+  validate(fileScopeQuerySchema, 'query'),
+  get
+);
+router.patch(
+  '/:id',
+  authenticate,
+  validate(fileIdParamSchema, 'params'),
+  validate(fileScopeQuerySchema, 'query'),
+  validate(updateFileSchema),
+  update
+);
+router.delete(
+  '/:id',
+  authenticate,
+  validate(fileIdParamSchema, 'params'),
+  validate(fileScopeQuerySchema, 'query'),
+  remove
+);
 
 export default router;

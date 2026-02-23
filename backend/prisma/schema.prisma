@@ -21,19 +21,26 @@ model User {
   files       File[]
   folders     Folder[]
   auditLogs   AuditLog[]
+  ownedFamilies Family[] @relation("FamilyOwner")
+  familyMembers FamilyMember[]
+  sentFamilyInvites FamilyMember[] @relation("FamilyInvitedBy")
 }
 
 model Folder {
   id        String   @id @default(uuid())
   name      String
   userId    String
+  familyId  String?
   parentId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family    Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
   parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
   children  Folder[] @relation("FolderHierarchy")
   files     File[]
+
+  @@index([familyId])
 }
 
 model File {
@@ -43,11 +50,57 @@ model File {
   size      Int      // Tamanho em bytes
   mimeType  String
   userId    String
+  familyId  String?
   folderId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family    Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
   folder    Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+}
+
+enum FamilyMemberStatus {
+  pending
+  accepted
+  declined
+}
+
+model Family {
+  id        String   @id @default(uuid())
+  name      String?
+  ownerId   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User     @relation("FamilyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   FamilyMember[]
+  folders   Folder[]
+  files     File[]
+
+  @@index([ownerId])
+}
+
+model FamilyMember {
+  id         String             @id @default(uuid())
+  familyId   String
+  userId     String?
+  email      String
+  status     FamilyMemberStatus @default(pending)
+  invitedById String
+  invitedAt  DateTime           @default(now())
+  acceptedAt DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  family     Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user       User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy  User               @relation("FamilyInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, email])
+  @@unique([familyId, userId])
+  @@index([familyId, status])
+  @@index([userId, status])
+  @@index([email, status])
 }
 
 model AuditLog {

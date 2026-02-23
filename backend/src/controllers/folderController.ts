@@ -2,6 +2,20 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { createAuditLog } from '../lib/auditLog';
+import { requireFamilyAccess } from '../lib/familyAccess';
+
+function normalizeFamilyId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.toLowerCase() === 'null') return null;
+  return normalized;
+}
+
+function resolveFamilyId(req: Request): string | null {
+  const fromQuery = normalizeFamilyId(req.query.familyId);
+  if (fromQuery) return fromQuery;
+  return normalizeFamilyId(req.body?.familyId);
+}
 
 // Lista pastas do usuário autenticado (query opcional parentId: omitido/null = raiz).
 export async function list(req: Request, res: Response): Promise<void> {
@@ -13,11 +27,21 @@ export async function list(req: Request, res: Response): Promise<void> {
     }
 
     const parentId = req.query.parentId as string | undefined;
+    const familyId = resolveFamilyId(req);
     const isRoot = parentId === undefined || parentId === '' || parentId === 'null';
+
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
 
     const folders = await prisma.folder.findMany({
       where: {
-        userId,
+        ...(familyId ? {} : { userId }),
+        familyId: familyId ?? null,
         parentId: isRoot ? null : parentId,
       },
       orderBy: { name: 'asc' },
@@ -35,10 +59,18 @@ export async function list(req: Request, res: Response): Promise<void> {
       folders.map(async (folder) => {
         const [childrenCount, filesCount] = await Promise.all([
           prisma.folder.count({
-            where: { parentId: folder.id, userId },
+            where: {
+              parentId: folder.id,
+              ...(familyId ? {} : { userId }),
+              familyId: familyId ?? null,
+            },
           }),
           prisma.file.count({
-            where: { folderId: folder.id, userId },
+            where: {
+              folderId: folder.id,
+              ...(familyId ? {} : { userId }),
+              familyId: familyId ?? null,
+            },
           }),
         ]);
 
@@ -67,6 +99,15 @@ export async function create(req: Request, res: Response): Promise<void> {
     }
 
     const { name, parentId } = req.body as { name?: string; parentId?: string | null };
+    const familyId = resolveFamilyId(req);
+
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
 
     if (!name || typeof name !== 'string') {
       res.status(400).json({ error: 'Name is required' });
@@ -81,7 +122,7 @@ export async function create(req: Request, res: Response): Promise<void> {
 
     if (parentId != null && parentId !== '') {
       const parent = await prisma.folder.findFirst({
-        where: { id: parentId, userId },
+        where: familyId ? { id: parentId, familyId } : { id: parentId, userId, familyId: null },
       });
       if (!parent) {
         res.status(404).json({ error: 'Parent folder not found' });
@@ -93,6 +134,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       data: {
         name: trimmedName,
         userId,
+        familyId,
         parentId: parentId && parentId !== '' ? parentId : null,
       },
       select: {
@@ -107,10 +149,18 @@ export async function create(req: Request, res: Response): Promise<void> {
     // Adiciona contagens de filhos e arquivos
     const [childrenCount, filesCount] = await Promise.all([
       prisma.folder.count({
-        where: { parentId: folder.id, userId },
+        where: {
+          parentId: folder.id,
+          ...(familyId ? {} : { userId }),
+          familyId: familyId ?? null,
+        },
       }),
       prisma.file.count({
-        where: { folderId: folder.id, userId },
+        where: {
+          folderId: folder.id,
+          ...(familyId ? {} : { userId }),
+          familyId: familyId ?? null,
+        },
       }),
     ]);
 
@@ -148,9 +198,18 @@ export async function get(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
 
     const folder = await prisma.folder.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
       select: {
         id: true,
         name: true,
@@ -200,9 +259,18 @@ export async function remove(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
 
     const folder = await prisma.folder.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
     });
 
     if (!folder) {
@@ -233,7 +301,11 @@ export async function remove(req: Request, res: Response): Promise<void> {
 }
 
 // Helper function para verificar se uma pasta é descendente de outra
-async function isDescendant(folderId: string, ancestorId: string): Promise<boolean> {
+async function isDescendant(
+  folderId: string,
+  ancestorId: string,
+  scope: { userId: string; familyId: string | null }
+): Promise<boolean> {
   let currentId: string | null = folderId;
   const visited = new Set<string>();
 
@@ -247,13 +319,23 @@ async function isDescendant(folderId: string, ancestorId: string): Promise<boole
       return true;
     }
 
-    type FolderParent = { parentId: string | null } | null;
+    type FolderParent = {
+      parentId: string | null;
+      userId: string;
+      familyId: string | null;
+    } | null;
     const folderResult: FolderParent = await prisma.folder.findUnique({
       where: { id: currentId },
-      select: { parentId: true },
+      select: { parentId: true, userId: true, familyId: true },
     });
 
     if (!folderResult) {
+      break;
+    }
+
+    if (scope.familyId) {
+      if (folderResult.familyId !== scope.familyId) break;
+    } else if (folderResult.userId !== scope.userId || folderResult.familyId !== null) {
       break;
     }
 
@@ -273,14 +355,23 @@ export async function update(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
     const { name, parentId } = req.body as {
       name?: string;
       parentId?: string | null;
     };
 
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     // Verifica se a pasta existe e pertence ao usuário
     const folder = await prisma.folder.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
     });
 
     if (!folder) {
@@ -321,7 +412,9 @@ export async function update(req: Request, res: Response): Promise<void> {
       // Se não é raiz, valida que a pasta pai existe e pertence ao usuário
       if (newParentId !== null) {
         const parent = await prisma.folder.findFirst({
-          where: { id: newParentId, userId },
+          where: familyId
+            ? { id: newParentId, familyId }
+            : { id: newParentId, userId, familyId: null },
         });
 
         if (!parent) {
@@ -330,7 +423,10 @@ export async function update(req: Request, res: Response): Promise<void> {
         }
 
         // Verifica se não está tentando mover para um descendente (evita ciclo)
-        const wouldCreateCycle = await isDescendant(newParentId, id);
+        const wouldCreateCycle = await isDescendant(newParentId, id, {
+          userId,
+          familyId,
+        });
         if (wouldCreateCycle) {
           res.status(400).json({
             error: 'Cannot move folder into its own descendant',
@@ -364,10 +460,18 @@ export async function update(req: Request, res: Response): Promise<void> {
     // Adiciona contagens de filhos e arquivos
     const [childrenCount, filesCount] = await Promise.all([
       prisma.folder.count({
-        where: { parentId: updatedFolder.id, userId },
+        where: {
+          parentId: updatedFolder.id,
+          ...(familyId ? {} : { userId }),
+          familyId: familyId ?? null,
+        },
       }),
       prisma.file.count({
-        where: { folderId: updatedFolder.id, userId },
+        where: {
+          folderId: updatedFolder.id,
+          ...(familyId ? {} : { userId }),
+          familyId: familyId ?? null,
+        },
       }),
     ]);
 

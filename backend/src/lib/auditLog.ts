@@ -8,7 +8,7 @@ type AuditMetadata = Prisma.InputJsonValue;
 interface CreateAuditLogParams {
   req: Request;
   action: string;
-  resourceType: 'user' | 'folder' | 'file' | 'auth';
+  resourceType: 'user' | 'folder' | 'file' | 'auth' | 'family' | 'family_member';
   resourceId?: string | null;
   userId?: string | null;
   metadata?: AuditMetadata;

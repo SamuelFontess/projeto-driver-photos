@@ -8,6 +8,7 @@ import { PASTA_UPLOAD } from '../lib/uploads';
 import { isAllowedUploadMimeType, max_upload_file_size_bytes } from '../lib/multer';
 import { createAuditLog } from '../lib/auditLog';
 import { getFirebaseBucket } from '../lib/firebase';
+import { requireFamilyAccess } from '../lib/familyAccess';
 import {
   getPreviewFromCache,
   previewCacheMaxBytes,
@@ -33,10 +34,24 @@ const CAMPOS_ARQUIVO = {
   name: true,
   size: true,
   mimeType: true,
+  familyId: true,
   folderId: true,
   createdAt: true,
   updatedAt: true,
 } as const;
+
+function normalizeFamilyId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.toLowerCase() === 'null') return null;
+  return normalized;
+}
+
+function resolveFamilyId(req: Request): string | null {
+  const fromQuery = normalizeFamilyId(req.query.familyId);
+  if (fromQuery) return fromQuery;
+  return normalizeFamilyId(req.body?.familyId);
+}
 
 async function writeBufferToDisk(
   userId: string,
@@ -62,22 +77,33 @@ export async function list(req: Request, res: Response): Promise<void> {
     }
 
     const folderIdParam = req.query.folderId as string | undefined;
+    const familyId = resolveFamilyId(req);
     const searchParam =
       typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
     const isRoot =
       folderIdParam === undefined || folderIdParam === '' || folderIdParam === 'null';
 
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     const whereClause =
       searchParam && searchParam.length > 0
         ? {
-            userId,
+            ...(familyId ? {} : { userId }),
+            familyId: familyId ?? null,
             name: {
               contains: searchParam,
               mode: 'insensitive' as const,
             },
           }
         : {
-            userId,
+            ...(familyId ? {} : { userId }),
+            familyId: familyId ?? null,
             folderId: isRoot ? null : folderIdParam,
           };
 
@@ -125,10 +151,21 @@ export async function upload(req: Request, res: Response): Promise<void> {
     }
 
     const folderIdParam = req.body.folderId as string | undefined;
+    const familyId = resolveFamilyId(req);
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     let folderId: string | null = null;
     if (folderIdParam != null && folderIdParam !== '') {
       const folder = await prisma.folder.findFirst({
-        where: { id: folderIdParam, userId },
+        where: familyId
+          ? { id: folderIdParam, familyId }
+          : { id: folderIdParam, userId, familyId: null },
       });
       if (!folder) {
         res.status(404).json({ error: 'Folder not found' });
@@ -143,6 +180,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
       name: string;
       size: number;
       mimeType: string;
+      familyId: string | null;
       folderId: string | null;
       createdAt: Date;
       updatedAt: Date;
@@ -183,6 +221,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
           size: file.size,
           mimeType,
           userId,
+          familyId,
           folderId,
         },
         select: CAMPOS_ARQUIVO,
@@ -224,8 +263,17 @@ export async function download(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     const fileRecord = await prisma.file.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
       select: { path: true, name: true, mimeType: true },
     });
 
@@ -340,8 +388,17 @@ export async function preview(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     const fileRecord = await prisma.file.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
       select: { id: true, path: true, name: true, mimeType: true, size: true },
     });
 
@@ -554,8 +611,17 @@ export async function get(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     const file = await prisma.file.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
       select: CAMPOS_ARQUIVO,
     });
 
@@ -580,13 +646,22 @@ export async function update(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     const { name, folderId } = req.body as {
       name?: string;
       folderId?: string | null;
     };
 
     const file = await prisma.file.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
       select: { id: true },
     });
 
@@ -617,7 +692,9 @@ export async function update(req: Request, res: Response): Promise<void> {
 
       if (nextFolderId !== null) {
         const folder = await prisma.folder.findFirst({
-          where: { id: nextFolderId, userId },
+          where: familyId
+            ? { id: nextFolderId, familyId }
+            : { id: nextFolderId, userId, familyId: null },
           select: { id: true },
         });
 
@@ -669,8 +746,17 @@ export async function remove(req: Request, res: Response): Promise<void> {
     }
 
     const { id } = req.params;
+    const familyId = resolveFamilyId(req);
+    if (familyId) {
+      const familyAccess = await requireFamilyAccess(userId, familyId);
+      if (!familyAccess.ok) {
+        res.status(familyAccess.status).json({ error: familyAccess.error });
+        return;
+      }
+    }
+
     const file = await prisma.file.findFirst({
-      where: { id, userId },
+      where: familyId ? { id, familyId } : { id, userId, familyId: null },
       select: { id: true, path: true },
     });
 
