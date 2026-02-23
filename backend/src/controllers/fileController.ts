@@ -19,6 +19,11 @@ function isStoragePath(filePath: string): boolean {
   return filePath.startsWith('users/');
 }
 
+function getLegacyStoragePath(diskPath: string): string | null {
+  if (isStoragePath(diskPath)) return null;
+  return `users/${diskPath}`;
+}
+
 function sanitizeStorageName(name: string): string {
   return (name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').trim() || 'file';
 }
@@ -265,8 +270,34 @@ export async function download(req: Request, res: Response): Promise<void> {
 
     const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
     if (!fs.existsSync(absolutePath)) {
-      logger.warn('File on disk missing', { path: absolutePath });
-      res.status(404).json({ error: 'File not found' });
+      const legacyPath = getLegacyStoragePath(fileRecord.path);
+      if (legacyPath) {
+        const bucket = getFirebaseBucket();
+        if (bucket) {
+          try {
+            const storageFile = bucket.file(legacyPath);
+            const [exists] = await storageFile.exists();
+            if (exists) {
+              const readStream = storageFile.createReadStream();
+              readStream.on('error', (err) => {
+                logger.error('File stream error', err);
+                if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+                else res.end();
+              });
+              readStream.pipe(res);
+              return;
+            }
+          } catch {
+            // fall through to 404
+          }
+        }
+      }
+      logger.warn('File on disk missing', { path: absolutePath, fileId: id });
+      res.status(404).json({
+        error: 'File not found',
+        code: 'LEGACY_FILE_UNAVAILABLE',
+        message: 'File was stored locally and is no longer available.',
+      });
       return;
     }
 
@@ -401,8 +432,63 @@ export async function preview(req: Request, res: Response): Promise<void> {
 
     const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
     if (!fs.existsSync(absolutePath)) {
-      logger.warn('Preview file on disk missing', { path: absolutePath, fileId: fileRecord.id });
-      res.status(404).json({ error: 'File not found' });
+      const legacyPath = getLegacyStoragePath(fileRecord.path);
+      if (legacyPath) {
+        const bucket = getFirebaseBucket();
+        if (bucket) {
+          const storageFile = bucket.file(legacyPath);
+          try {
+            const [exists] = await storageFile.exists();
+            if (exists) {
+              if (fileRecord.size <= previewCacheMaxBytes) {
+                const [fileBuffer] = await storageFile.download();
+                await setPreviewInCache(cacheKey, fileBuffer);
+                await createAuditLog({
+                  req,
+                  action: 'file.preview',
+                  resourceType: 'file',
+                  resourceId: fileRecord.id,
+                  metadata: {
+                    source: 'storage-legacy-buffer',
+                    size: fileBuffer.length,
+                    mimeType,
+                  },
+                });
+                setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
+                res.end(fileBuffer);
+                return;
+              }
+              setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
+              await createAuditLog({
+                req,
+                action: 'file.preview',
+                resourceType: 'file',
+                resourceId: fileRecord.id,
+                metadata: { source: 'storage-legacy-stream', size: fileRecord.size, mimeType },
+              });
+              const readStream = storageFile.createReadStream();
+              readStream.on('error', (err) => {
+                logger.error('File preview stream error', err);
+                if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+                else res.end();
+              });
+              readStream.pipe(res);
+              return;
+            }
+          } catch {
+            // fall through to 404
+          }
+        }
+      }
+      logger.warn('Preview file on disk missing (legacy)', {
+        path: absolutePath,
+        fileId: fileRecord.id,
+      });
+      res.status(404).json({
+        error: 'File not found',
+        code: 'LEGACY_FILE_UNAVAILABLE',
+        message: 'File was stored locally and is no longer available.',
+      });
       return;
     }
 
