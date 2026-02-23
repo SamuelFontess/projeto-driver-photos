@@ -15,6 +15,7 @@ export interface Folder {
 export interface CreateFolderPayload {
   name: string;
   parentId?: string | null;
+  familyId?: string;
 }
 
 export interface FolderFile {
@@ -32,10 +33,21 @@ export interface FolderWithDetails extends Folder {
   files: FolderFile[];
 }
 
-export async function getFolders(parentId?: string | null): Promise<{ folders: Folder[] }> {
+export interface FolderScopeParams {
+  familyId?: string;
+}
+
+export async function getFolders(
+  parentId?: string | null,
+  scope: FolderScopeParams = {}
+): Promise<{ folders: Folder[] }> {
+  const { familyId } = scope;
   const params = new URLSearchParams();
   if (parentId !== undefined && parentId !== null) {
     params.set('parentId', parentId);
+  }
+  if (familyId) {
+    params.set('familyId', familyId);
   }
   const query = params.toString();
   return request<{ folders: Folder[] }>(
@@ -46,32 +58,65 @@ export async function getFolders(parentId?: string | null): Promise<{ folders: F
 
 export async function createFolder(
   name: string,
-  parentId?: string | null
+  parentId?: string | null,
+  scope: FolderScopeParams = {}
 ): Promise<{ folder: Folder }> {
+  const { familyId } = scope;
   return request<{ folder: Folder }>('/api/folders', {
     method: 'POST',
-    body: JSON.stringify({ name, parentId: parentId ?? null }),
+    body: JSON.stringify({ name, parentId: parentId ?? null, familyId }),
   });
 }
 
-export async function getFolder(id: string): Promise<{ folder: FolderWithDetails }> {
-  return request<{ folder: FolderWithDetails }>(`/api/folders/${encodeURIComponent(id)}`, {
-    method: 'GET',
-  });
+export async function getFolder(
+  id: string,
+  scope: FolderScopeParams = {}
+): Promise<{ folder: FolderWithDetails }> {
+  const params = new URLSearchParams();
+  if (scope.familyId) {
+    params.set('familyId', scope.familyId);
+  }
+  const query = params.toString();
+
+  return request<{ folder: FolderWithDetails }>(
+    `/api/folders/${encodeURIComponent(id)}${query ? `?${query}` : ''}`,
+    {
+      method: 'GET',
+    }
+  );
 }
 
 export async function updateFolder(
   id: string,
-  data: { name?: string; parentId?: string | null }
+  data: { name?: string; parentId?: string | null },
+  scope: FolderScopeParams = {}
 ): Promise<{ folder: Folder }> {
-  return request<{ folder: Folder }>(`/api/folders/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+  const params = new URLSearchParams();
+  if (scope.familyId) {
+    params.set('familyId', scope.familyId);
+  }
+  const query = params.toString();
+
+  return request<{ folder: Folder }>(
+    `/api/folders/${encodeURIComponent(id)}${query ? `?${query}` : ''}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }
+  );
 }
 
-export async function deleteFolder(id: string): Promise<void> {
-  await request<void>(`/api/folders/${encodeURIComponent(id)}`, {
+export async function deleteFolder(
+  id: string,
+  scope: FolderScopeParams = {}
+): Promise<void> {
+  const params = new URLSearchParams();
+  if (scope.familyId) {
+    params.set('familyId', scope.familyId);
+  }
+  const query = params.toString();
+
+  await request<void>(`/api/folders/${encodeURIComponent(id)}${query ? `?${query}` : ''}`, {
     method: 'DELETE',
   });
 }

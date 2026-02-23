@@ -8,6 +8,7 @@ import { cn } from '@/src/lib/utils';
 import {
   LayoutDashboard,
   User,
+  Users,
   LogOut,
   HardDrive,
   PanelLeftClose,
@@ -17,6 +18,7 @@ import { useRouter } from 'next/navigation';
 
 const navItems = [
   { name: 'Início', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Família', href: '/dashboard/family', icon: Users },
   { name: 'Perfil', href: '/dashboard/profile', icon: User },
 ];
 
@@ -90,7 +92,10 @@ export function Sidebar() {
         isExpanded ? 'py-4' : 'pt-6 pb-4'
       )}>
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive =
+            item.href === '/dashboard/family'
+              ? pathname.startsWith('/dashboard/family')
+              : pathname === item.href;
           return (
             <Link
               key={item.name}

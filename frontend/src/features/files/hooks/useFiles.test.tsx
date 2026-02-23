@@ -29,9 +29,12 @@ describe('useFiles', () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 
-    const { result } = renderHook(() => useFiles('folder-1', 'report'), {
+    const { result } = renderHook(
+      () => useFiles('folder-1', { type: 'user' }, 'report'),
+      {
       wrapper,
-    });
+      }
+    );
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);

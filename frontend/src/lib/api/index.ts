@@ -3,6 +3,7 @@
 import * as auth from './auth';
 import * as folders from './folders';
 import * as files from './files';
+import * as families from './families';
 export { ApiError } from './client';
 
 export type {
@@ -22,6 +23,16 @@ export type {
 
 export { type FolderFile as FileItem } from './files';
 export type { UpdateFilePayload } from './files';
+export type {
+  FamilyMemberStatus,
+  FamilyInvitationAction,
+  FamilyUserSummary,
+  FamilySummary,
+  FamilyInvitation,
+  FamilyInvitationWithFamily,
+  FamilyMember,
+  FamilyWithOwner,
+} from './families';
 
 const api = {
   register: auth.register,
@@ -42,6 +53,12 @@ const api = {
   uploadFiles: files.uploadFiles,
   downloadFile: files.downloadFile,
   getFilePreviewBlob: files.getFilePreviewBlob,
+  createFamily: families.createFamily,
+  getFamilies: families.getFamilies,
+  inviteFamilyMember: families.inviteFamilyMember,
+  getFamilyInvitations: families.getFamilyInvitations,
+  replyFamilyInvitation: families.replyFamilyInvitation,
+  getFamilyMembers: families.getFamilyMembers,
 };
 
 export { api };

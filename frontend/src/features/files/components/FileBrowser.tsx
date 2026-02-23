@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFiles } from '../hooks/useFiles';
 import { useFolders } from '../hooks/useFolders';
-import { useCreateFolder, useUpdateFolder, useDeleteFolder } from '../hooks/useFolderActions';
+import { useUpdateFolder, useDeleteFolder } from '../hooks/useFolderActions';
 import { useUploadFiles, useDownloadFile, useDeleteFile } from '../hooks/useFileActions';
 import { FileActions } from './FileActions';
 import { BreadcrumbNav } from './BreadcrumbNav';
@@ -39,13 +39,24 @@ import { Button } from '@/src/components/ui';
 import { Skeleton } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/use-toast';
 import { type Folder, type FolderFile } from '@/src/lib/api';
-import { type BreadcrumbItem, type ViewMode } from '../types';
+import { type BreadcrumbItem, type FileBrowserScope, type ViewMode } from '../types';
 import { api } from '@/src/lib/api';
 
-export function FileBrowser() {
+interface FileBrowserProps {
+  scope?: FileBrowserScope;
+  basePath?: string;
+}
+
+function resolveFamilyId(scope: FileBrowserScope): string | undefined {
+  return scope.type === 'family' ? scope.familyId : undefined;
+}
+
+export function FileBrowser({ scope = { type: 'user' }, basePath }: FileBrowserProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentFolderId = searchParams.get('folder') || null;
+  const familyId = resolveFamilyId(scope);
+  const rootPath = basePath ?? (scope.type === 'family' ? '/dashboard/family' : '/dashboard');
 
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([
     { id: null, name: 'Raiz' },
@@ -67,16 +78,19 @@ export function FileBrowser() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Queries
-  const { data: foldersData, isLoading: foldersLoading } = useFolders(currentFolderId);
-  const { data: filesData, isLoading: filesLoading } = useFiles(currentFolderId, normalizedSearchQuery);
+  const { data: foldersData, isLoading: foldersLoading } = useFolders(currentFolderId, scope);
+  const { data: filesData, isLoading: filesLoading } = useFiles(
+    currentFolderId,
+    scope,
+    normalizedSearchQuery
+  );
   
   // Mutations
-  useCreateFolder();
-  const updateFolder = useUpdateFolder();
-  const deleteFolder = useDeleteFolder();
-  const deleteFile = useDeleteFile();
-  const uploadFiles = useUploadFiles();
-  const downloadFile = useDownloadFile();
+  const updateFolder = useUpdateFolder(scope);
+  const deleteFolder = useDeleteFolder(scope);
+  const deleteFile = useDeleteFile(scope);
+  const uploadFiles = useUploadFiles(scope);
+  const downloadFile = useDownloadFile(scope);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -93,19 +107,19 @@ export function FileBrowser() {
       }
 
       try {
-        const { folder } = await api.getFolder(currentFolderId);
+        const { folder } = await api.getFolder(currentFolderId, { familyId });
         setBreadcrumb([
           { id: null, name: 'Raiz' },
           { id: folder.id, name: folder.name }
         ]);
       } catch (error) {
         console.error('Failed to load folder details', error);
-        router.push('/dashboard');
+        router.push(rootPath);
       }
     };
 
     updateBreadcrumb();
-  }, [currentFolderId, router]);
+  }, [currentFolderId, familyId, rootPath, router]);
 
   // Filter based on search query
   const filteredFolders = folders.filter((folder) =>
@@ -118,18 +132,18 @@ export function FileBrowser() {
   const handleEnterFolder = useCallback((folder: Folder) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('folder', folder.id);
-    router.push(`/dashboard?${params.toString()}`);
-  }, [router, searchParams]);
+    router.push(`${rootPath}?${params.toString()}`);
+  }, [rootPath, router, searchParams]);
 
   const handleBreadcrumbClick = useCallback((item: BreadcrumbItem) => {
     if (item.id === null) {
-      router.push('/dashboard');
+      router.push(rootPath);
     } else {
       const params = new URLSearchParams(searchParams.toString());
       params.set('folder', item.id);
-      router.push(`/dashboard?${params.toString()}`);
+      router.push(`${rootPath}?${params.toString()}`);
     }
-  }, [router, searchParams]);
+  }, [rootPath, router, searchParams]);
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -200,7 +214,7 @@ export function FileBrowser() {
     setMoveTargetParentId(folder.parentId);
     // Carrega todas as pastas para o seletor de destino (chamada direta à API, sem hook)
     try {
-      const { folders: all } = await api.getFolders(null);
+      const { folders: all } = await api.getFolders(null, { familyId });
       setAllFolders(all);
     } catch {
       toast({
@@ -209,7 +223,7 @@ export function FileBrowser() {
         variant: 'destructive',
       });
     }
-  }, [toast]);
+  }, [familyId, toast]);
 
   const handleConfirmMove = useCallback(async () => {
     if (!moveFolderId) return;
@@ -233,10 +247,10 @@ export function FileBrowser() {
     if (!deleteFolderId) return;
     await deleteFolder.mutateAsync(deleteFolderId);
     if (currentFolderId === deleteFolderId) {
-       router.push('/dashboard');
+       router.push(rootPath);
     }
     setDeleteFolderId(null);
-  }, [deleteFolderId, deleteFolder, currentFolderId, router]);
+  }, [currentFolderId, deleteFolder, deleteFolderId, rootPath, router]);
 
   const handleConfirmFileDelete = useCallback(async () => {
     if (!deleteFileId) return;
@@ -279,7 +293,9 @@ export function FileBrowser() {
           Olá, {displayName}!
         </p>
         <p className="text-sm text-muted-foreground mb-6">
-          Gerencie suas pastas e arquivos abaixo.
+          {scope.type === 'family'
+            ? 'Gerencie as pastas e arquivos compartilhados da família.'
+            : 'Gerencie suas pastas e arquivos abaixo.'}
         </p>
 
         <div className="space-y-4">
@@ -287,6 +303,7 @@ export function FileBrowser() {
             <BreadcrumbNav items={breadcrumb} onItemClick={handleBreadcrumbClick} />
             <FileActions
               currentFolderId={currentFolderId}
+              scope={scope}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               onUploadClick={handleUploadClick}

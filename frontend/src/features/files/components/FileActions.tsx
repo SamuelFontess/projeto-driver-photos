@@ -15,10 +15,11 @@ import {
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { useCreateFolder } from '../hooks/useFolderActions';
-import { type ViewMode } from '../types';
+import { type FileBrowserScope, type ViewMode } from '../types';
 
 interface FileActionsProps {
   currentFolderId: string | null;
+  scope: FileBrowserScope;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onUploadClick: () => void;
@@ -26,13 +27,14 @@ interface FileActionsProps {
 
 export function FileActions({
   currentFolderId,
+  scope,
   viewMode,
   onViewModeChange,
   onUploadClick,
 }: FileActionsProps) {
   const [newFolderName, setNewFolderName] = useState('');
   const [open, setOpen] = useState(false);
-  const createFolder = useCreateFolder();
+  const createFolder = useCreateFolder(scope);
 
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();

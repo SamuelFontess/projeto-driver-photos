@@ -12,16 +12,20 @@ export interface UpdateFilePayload {
 
 export interface GetFilesParams {
   folderId?: string | null;
+  familyId?: string;
   search?: string;
 }
 
 export async function getFiles(
   queryParams: GetFilesParams = {}
 ): Promise<{ files: FolderFile[] }> {
-  const { folderId, search } = queryParams;
+  const { folderId, familyId, search } = queryParams;
   const params = new URLSearchParams();
   if (folderId !== undefined && folderId !== null) {
     params.set('folderId', folderId);
+  }
+  if (familyId) {
+    params.set('familyId', familyId);
   }
   if (search && search.trim().length > 0) {
     params.set('search', search.trim());
@@ -36,12 +40,16 @@ export async function getFiles(
 // Envia um único arquivo. Usa o campo 'files' para manter compatibilidade com o backend (multer.array)
 export async function uploadFile(
   file: File,
-  folderId?: string | null
+  folderId?: string | null,
+  familyId?: string
 ): Promise<{ file: FolderFile }> {
   const form = new FormData();
   form.append('files', file);
   if (folderId !== undefined && folderId !== null) {
     form.append('folderId', folderId);
+  }
+  if (familyId) {
+    form.append('familyId', familyId);
   }
   const result = await request<{ files: FolderFile[] }>('/api/files', {
     method: 'POST',
@@ -53,7 +61,8 @@ export async function uploadFile(
 // Envia múltiplos arquivos em uma única request (máx. 20 por vez, limite do backend)
 export async function uploadFiles(
   files: File[],
-  folderId?: string | null
+  folderId?: string | null,
+  familyId?: string
 ): Promise<{ files: FolderFile[] }> {
   const form = new FormData();
   for (const file of files) {
@@ -62,6 +71,9 @@ export async function uploadFiles(
   if (folderId !== undefined && folderId !== null) {
     form.append('folderId', folderId);
   }
+  if (familyId) {
+    form.append('familyId', familyId);
+  }
   return request<{ files: FolderFile[] }>('/api/files', {
     method: 'POST',
     body: form,
@@ -69,34 +81,69 @@ export async function uploadFiles(
 }
 
 export async function downloadFile(
-  id: string
+  id: string,
+  familyId?: string
 ): Promise<{ blob: Blob; filename?: string }> {
-  return requestBlob(`/api/files/${encodeURIComponent(id)}/download`);
+  const params = new URLSearchParams();
+  if (familyId) {
+    params.set('familyId', familyId);
+  }
+  const query = params.toString();
+  return requestBlob(`/api/files/${encodeURIComponent(id)}/download${query ? `?${query}` : ''}`);
 }
 
-export async function getFilePreviewBlob(id: string): Promise<Blob> {
-  const { blob } = await requestBlob(`/api/files/${encodeURIComponent(id)}/preview`);
+export async function getFilePreviewBlob(id: string, familyId?: string): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (familyId) {
+    params.set('familyId', familyId);
+  }
+  const query = params.toString();
+  const { blob } = await requestBlob(
+    `/api/files/${encodeURIComponent(id)}/preview${query ? `?${query}` : ''}`
+  );
   return blob;
 }
 
-export async function getFile(id: string): Promise<{ file: FolderFile }> {
-  return request<{ file: FolderFile }>(`/api/files/${encodeURIComponent(id)}`, {
-    method: 'GET',
-  });
+export async function getFile(id: string, familyId?: string): Promise<{ file: FolderFile }> {
+  const params = new URLSearchParams();
+  if (familyId) {
+    params.set('familyId', familyId);
+  }
+  const query = params.toString();
+  return request<{ file: FolderFile }>(
+    `/api/files/${encodeURIComponent(id)}${query ? `?${query}` : ''}`,
+    {
+      method: 'GET',
+    }
+  );
 }
 
 export async function updateFile(
   id: string,
-  data: UpdateFilePayload
+  data: UpdateFilePayload,
+  familyId?: string
 ): Promise<{ file: FolderFile }> {
-  return request<{ file: FolderFile }>(`/api/files/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+  const params = new URLSearchParams();
+  if (familyId) {
+    params.set('familyId', familyId);
+  }
+  const query = params.toString();
+  return request<{ file: FolderFile }>(
+    `/api/files/${encodeURIComponent(id)}${query ? `?${query}` : ''}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }
+  );
 }
 
-export async function deleteFile(id: string): Promise<void> {
-  await request<void>(`/api/files/${encodeURIComponent(id)}`, {
+export async function deleteFile(id: string, familyId?: string): Promise<void> {
+  const params = new URLSearchParams();
+  if (familyId) {
+    params.set('familyId', familyId);
+  }
+  const query = params.toString();
+  await request<void>(`/api/files/${encodeURIComponent(id)}${query ? `?${query}` : ''}`, {
     method: 'DELETE',
   });
 }

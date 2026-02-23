@@ -17,7 +17,7 @@ export interface UploadItem {
 
 interface UploadContextType {
   uploads: UploadItem[];
-  uploadFiles: (files: File[], folderId: string | null) => Promise<void>;
+  uploadFiles: (files: File[], folderId: string | null, familyId?: string) => Promise<void>;
   clearCompleted: () => void;
   isUploading: boolean;
 }
@@ -31,7 +31,11 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const isUploading = uploads.some((u) => u.status === 'uploading' || u.status === 'pending');
 
-  const uploadFiles = useCallback(async (files: File[], folderId: string | null) => {
+  const uploadFiles = useCallback(async (
+    files: File[],
+    folderId: string | null,
+    familyId?: string
+  ) => {
     const newUploads: UploadItem[] = files.map((file) => ({
       id: Math.random().toString(36).substring(7),
       file,
@@ -52,7 +56,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       );
 
       try {
-        await api.uploadFile(item.file, folderId);
+        await api.uploadFile(item.file, folderId, familyId);
         setUploads((prev) =>
           prev.map((u) => (u.id === item.id ? { ...u, status: 'success', progress: 100 } : u))
         );
@@ -70,8 +74,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     }
 
     // Invalidate queries to refresh file list
-    queryClient.invalidateQueries({ queryKey: ['files', folderId] });
-    queryClient.invalidateQueries({ queryKey: ['folders', folderId] }); // in case folder counts update
+    queryClient.invalidateQueries({ queryKey: ['files'] });
+    queryClient.invalidateQueries({ queryKey: ['folders'] });
   }, [queryClient, toast]);
 
   const clearCompleted = useCallback(() => {
