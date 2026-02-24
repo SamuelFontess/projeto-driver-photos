@@ -6,6 +6,7 @@ declare module 'redis' {
     connect(): Promise<void>;
     get(options: unknown, key: string): Promise<Buffer | null>;
     set(key: string, value: Buffer, options: { EX: number }): Promise<void>;
+    rPush(key: string, value: string): Promise<number>;
   };
 
   export function createClient(options?: { url?: string }): RedisClientType;

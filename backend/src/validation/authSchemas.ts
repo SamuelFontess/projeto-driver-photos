@@ -19,6 +19,15 @@ export const googleAuthSchema = z.object({
   idToken: z.string().min(1, 'idToken is required'),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email('Email must be valid'),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, 'Token is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
 export const updateProfileSchema = z
   .object({
     name: z.string().trim().min(1, 'Name cannot be empty').optional(),

@@ -24,6 +24,7 @@ model User {
   ownedFamilies Family[] @relation("FamilyOwner")
   familyMembers FamilyMember[]
   sentFamilyInvites FamilyMember[] @relation("FamilyInvitedBy")
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Folder {
@@ -118,4 +119,16 @@ model AuditLog {
   @@index([userId, createdAt])
   @@index([resourceType, resourceId, createdAt])
   @@index([action, createdAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }

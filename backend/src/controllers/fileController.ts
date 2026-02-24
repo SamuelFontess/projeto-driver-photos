@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
 import fs from 'fs';
+import { PASTA_UPLOAD } from '../lib/uploads';
 import path from 'path';
+import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
-import { PASTA_UPLOAD } from '../lib/uploads';
 import { isAllowedUploadMimeType, max_upload_file_size_bytes } from '../lib/multer';
 import { createAuditLog } from '../lib/auditLog';
 import { getFirebaseBucket } from '../lib/firebase';
@@ -175,6 +175,10 @@ export async function upload(req: Request, res: Response): Promise<void> {
     }
 
     const bucket = getFirebaseBucket();
+    if (!bucket) {
+      res.status(503).json({ error: 'Storage unavailable' });
+      return;
+    }
     const created: Array<{
       id: string;
       name: string;
@@ -198,20 +202,12 @@ export async function upload(req: Request, res: Response): Promise<void> {
         continue;
       }
 
-      let filePath: string;
-
-      if (bucket) {
-        const sanitizedName = sanitizeStorageName(name);
-        filePath = `users/${userId}/${fileId}-${sanitizedName}`;
-        const storageFile = bucket.file(filePath);
-        await storageFile.save(buffer, {
-          metadata: { contentType: mimeType },
-        });
-      } else {
-        const sanitized = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const diskFilename = `${fileId}-${sanitized}`;
-        filePath = await writeBufferToDisk(userId, buffer, diskFilename);
-      }
+      const sanitizedName = sanitizeStorageName(name);
+      const filePath = `users/${userId}/${fileId}-${sanitizedName}`;
+      const storageFile = bucket.file(filePath);
+      await storageFile.save(buffer, {
+        metadata: { contentType: mimeType },
+      });
 
       const record = await prisma.file.create({
         data: {
@@ -300,47 +296,15 @@ export async function download(req: Request, res: Response): Promise<void> {
       },
     });
 
-    if (isStoragePath(fileRecord.path)) {
-      const bucket = getFirebaseBucket();
-      if (!bucket) {
-        res.status(503).json({ error: 'Storage unavailable' });
-        return;
-      }
-      const readStream = bucket.file(fileRecord.path).createReadStream();
-      readStream.on('error', (err) => {
-        logger.error('File stream error', err);
-        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
-        else res.end();
-      });
-      readStream.pipe(res);
+    const bucket = getFirebaseBucket();
+    if (!bucket) {
+      res.status(503).json({ error: 'Storage unavailable' });
       return;
     }
-
-    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
-    if (!fs.existsSync(absolutePath)) {
-      const legacyPath = getLegacyStoragePath(fileRecord.path);
-      if (legacyPath) {
-        const bucket = getFirebaseBucket();
-        if (bucket) {
-          try {
-            const storageFile = bucket.file(legacyPath);
-            const [exists] = await storageFile.exists();
-            if (exists) {
-              const readStream = storageFile.createReadStream();
-              readStream.on('error', (err) => {
-                logger.error('File stream error', err);
-                if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
-                else res.end();
-              });
-              readStream.pipe(res);
-              return;
-            }
-          } catch {
-            // fall through to 404
-          }
-        }
-      }
-      logger.warn('File on disk missing', { path: absolutePath, fileId: id });
+    const storagePath = isStoragePath(fileRecord.path)
+      ? fileRecord.path
+      : getLegacyStoragePath(fileRecord.path);
+    if (!storagePath) {
       res.status(404).json({
         error: 'File not found',
         code: 'LEGACY_FILE_UNAVAILABLE',
@@ -348,14 +312,31 @@ export async function download(req: Request, res: Response): Promise<void> {
       });
       return;
     }
-
-    const stream = fs.createReadStream(absolutePath);
-    stream.on('error', (err) => {
-      logger.error('File stream error', err);
-      if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
-      else res.end();
-    });
-    stream.pipe(res);
+    try {
+      const storageFile = bucket.file(storagePath);
+      const [exists] = await storageFile.exists();
+      if (!exists) {
+        res.status(404).json({
+          error: 'File not found',
+          code: 'LEGACY_FILE_UNAVAILABLE',
+          message: 'File was stored locally and is no longer available.',
+        });
+        return;
+      }
+      const readStream = storageFile.createReadStream();
+      readStream.on('error', (err) => {
+        logger.error('File stream error', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+        else res.end();
+      });
+      readStream.pipe(res);
+    } catch {
+      res.status(404).json({
+        error: 'File not found',
+        code: 'LEGACY_FILE_UNAVAILABLE',
+        message: 'File was stored locally and is no longer available.',
+      });
+    }
   } catch (error) {
     logger.error('File download error', error);
     if (!res.headersSent) {
@@ -422,74 +403,15 @@ export async function preview(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (isStoragePath(fileRecord.path)) {
-      const bucket = getFirebaseBucket();
-      if (!bucket) {
-        res.status(503).json({ error: 'Storage unavailable' });
-        return;
-      }
-      const storageFile = bucket.file(fileRecord.path);
-      if (fileRecord.size <= previewCacheMaxBytes) {
-        try {
-          const [fileBuffer] = await storageFile.download();
-          await setPreviewInCache(cacheKey, fileBuffer);
-          setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
-          res.end(fileBuffer);
-          return;
-        } catch (error) {
-          logger.warn('Preview Storage download failed, fallback to stream', {
-            fileId: fileRecord.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-      setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
-      const readStream = storageFile.createReadStream();
-      readStream.on('error', (err) => {
-        logger.error('File preview stream error', err);
-        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
-        else res.end();
-      });
-      readStream.pipe(res);
+    const bucket = getFirebaseBucket();
+    if (!bucket) {
+      res.status(503).json({ error: 'Storage unavailable' });
       return;
     }
-
-    const absolutePath = path.join(PASTA_UPLOAD, fileRecord.path);
-    if (!fs.existsSync(absolutePath)) {
-      const legacyPath = getLegacyStoragePath(fileRecord.path);
-      if (legacyPath) {
-        const bucket = getFirebaseBucket();
-        if (bucket) {
-          const storageFile = bucket.file(legacyPath);
-          try {
-            const [exists] = await storageFile.exists();
-            if (exists) {
-              if (fileRecord.size <= previewCacheMaxBytes) {
-                const [fileBuffer] = await storageFile.download();
-                await setPreviewInCache(cacheKey, fileBuffer);
-                setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
-                res.end(fileBuffer);
-                return;
-              }
-              setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
-              const readStream = storageFile.createReadStream();
-              readStream.on('error', (err) => {
-                logger.error('File preview stream error', err);
-                if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
-                else res.end();
-              });
-              readStream.pipe(res);
-              return;
-            }
-          } catch {
-            // fall through to 404
-          }
-        }
-      }
-      logger.warn('Preview file on disk missing (legacy)', {
-        path: absolutePath,
-        fileId: fileRecord.id,
-      });
+    const storagePath = isStoragePath(fileRecord.path)
+      ? fileRecord.path
+      : getLegacyStoragePath(fileRecord.path);
+    if (!storagePath) {
       res.status(404).json({
         error: 'File not found',
         code: 'LEGACY_FILE_UNAVAILABLE',
@@ -497,30 +419,47 @@ export async function preview(req: Request, res: Response): Promise<void> {
       });
       return;
     }
-
+    const storageFile = bucket.file(storagePath);
+    try {
+      const [exists] = await storageFile.exists();
+      if (!exists) {
+        res.status(404).json({
+          error: 'File not found',
+          code: 'LEGACY_FILE_UNAVAILABLE',
+          message: 'File was stored locally and is no longer available.',
+        });
+        return;
+      }
+    } catch {
+      res.status(404).json({
+        error: 'File not found',
+        code: 'LEGACY_FILE_UNAVAILABLE',
+        message: 'File was stored locally and is no longer available.',
+      });
+      return;
+    }
     if (fileRecord.size <= previewCacheMaxBytes) {
       try {
-        const fileBuffer = await fs.promises.readFile(absolutePath);
+        const [fileBuffer] = await storageFile.download();
         await setPreviewInCache(cacheKey, fileBuffer);
         setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
         res.end(fileBuffer);
         return;
       } catch (error) {
-        logger.warn('Preview readFile failed, fallback to stream', {
+        logger.warn('Preview Storage download failed, fallback to stream', {
           fileId: fileRecord.id,
           error: error instanceof Error ? error.message : String(error),
         });
       }
     }
-
     setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
-    const stream = fs.createReadStream(absolutePath);
-    stream.on('error', (err) => {
+    const readStream = storageFile.createReadStream();
+    readStream.on('error', (err) => {
       logger.error('File preview stream error', err);
       if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
       else res.end();
     });
-    stream.pipe(res);
+    readStream.pipe(res);
   } catch (error) {
     logger.error('File preview error', error);
     if (!res.headersSent) {
@@ -692,28 +631,15 @@ export async function remove(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (isStoragePath(file.path)) {
-      const bucket = getFirebaseBucket();
-      if (bucket) {
-        try {
-          await bucket.file(file.path).delete();
-        } catch (error) {
-          const err = error as { code?: number };
-          if (err.code !== 404) {
-            logger.error('File delete from Storage error', error);
-            res.status(500).json({ error: 'Internal server error' });
-            return;
-          }
-        }
-      }
-    } else {
-      const absolutePath = path.join(PASTA_UPLOAD, file.path);
+    const bucket = getFirebaseBucket();
+    const storagePath = isStoragePath(file.path) ? file.path : getLegacyStoragePath(file.path);
+    if (bucket && storagePath) {
       try {
-        await fs.promises.unlink(absolutePath);
+        await bucket.file(storagePath).delete();
       } catch (error) {
-        const err = error as NodeJS.ErrnoException;
-        if (err.code !== 'ENOENT') {
-          logger.error('File delete from disk error', err);
+        const err = error as { code?: number };
+        if (err.code !== 404) {
+          logger.error('File delete from Storage error', error);
           res.status(500).json({ error: 'Internal server error' });
           return;
         }

@@ -13,6 +13,15 @@ export interface LoginData {
   password: string;
 }
 
+export interface ForgotPasswordData {
+  email: string;
+}
+
+export interface ResetPasswordData {
+  token: string;
+  password: string;
+}
+
 export interface AuthResponse {
   message: string;
   user: {
@@ -49,6 +58,20 @@ export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
   return request<AuthResponse>('/api/auth/google', {
     method: 'POST',
     body: JSON.stringify({ idToken }),
+  });
+}
+
+export async function forgotPassword(data: ForgotPasswordData): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function resetPassword(data: ResetPasswordData): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 

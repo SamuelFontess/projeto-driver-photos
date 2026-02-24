@@ -7,6 +7,7 @@ type RedisClient = {
   connect(): Promise<void>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string, options: { EX: number }): Promise<void>;
+  rPush(key: string, value: string): Promise<number>;
 };
 
 type RedisModule = {
@@ -15,7 +16,6 @@ type RedisModule = {
 
 function loadRedisModule(): RedisModule | null {
   try {
-    // Lazy require keeps backend running even when dependency is not installed yet.
     return require('redis') as RedisModule;
   } catch {
     logger.warn('Redis package not found. Preview cache will use disk fallback only.');

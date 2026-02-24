@@ -11,6 +11,20 @@ export const registerSchema = z.object({
   password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
 })
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Email inválido"),
+})
+
+export const resetPasswordSchema = z
+  .object({
+    password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+    confirmPassword: z.string().min(1, "Confirme sua nova senha"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "As senhas não coincidem.",
+    path: ["confirmPassword"],
+  })
+
 export const profilePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Digite a senha atual para alterar a senha."),
@@ -24,4 +38,6 @@ export const profilePasswordSchema = z
 
 export type LoginFormData = z.infer<typeof loginSchema>
 export type RegisterFormData = z.infer<typeof registerSchema>
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
 export type ProfilePasswordFormData = z.infer<typeof profilePasswordSchema>

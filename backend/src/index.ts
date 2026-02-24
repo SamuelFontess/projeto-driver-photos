@@ -42,13 +42,13 @@ async function bootstrap() {
   const { ensureUploadDir } = await import('./lib/uploads');
   const { initFirebase } = await import('./lib/firebase');
   const { app } = await import('./app');
-
   ensureUploadDir();
   initFirebase();
+  const { getRedisClient } = await import('./lib/redis');
 
   const PORT = process.env.PORT || 3000;
   if (require.main === module) {
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
       if (loadedEnvFileName) {
         console.log(`Loaded environment from ${loadedEnvFileName}`);
       } else {
@@ -57,6 +57,18 @@ async function bootstrap() {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
       console.log(`Auth routes: http://localhost:${PORT}/api/auth`);
+
+      getRedisClient()
+        .then((client) => {
+          if (client) {
+            console.log('Redis: connected (cache + email queue)');
+          } else {
+            console.log('Redis: not available (cache/queue will use fallback or skip)');
+          }
+        })
+        .catch(() => {
+          console.log('Redis: not available (cache/queue will use fallback or skip)');
+        });
     });
   }
 }

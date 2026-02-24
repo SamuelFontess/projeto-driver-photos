@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { createAuditLog } from '../lib/auditLog';
 import { getUserPrimaryEmail, hasFamilyAccess } from '../lib/familyAccess';
+import { publishEmailQueueEvent } from '../lib/emailQueue';
 
 const FAMILY_SELECT = {
   id: true,
@@ -227,7 +228,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
 
     const family = await prisma.family.findUnique({
       where: { id: familyId },
-      select: { id: true, ownerId: true },
+      select: { id: true, name: true, ownerId: true },
     });
 
     if (!family) {
@@ -291,6 +292,15 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         familyId,
         invitedEmail: normalizedEmail,
       },
+    });
+
+    await publishEmailQueueEvent('family_invite', {
+      invitationId: invite.id,
+      familyId: family.id,
+      familyName: family.name,
+      invitedById,
+      invitedUserId: invitedUser.id,
+      invitedEmail: normalizedEmail,
     });
 
     res.status(201).json({ invitation: invite });

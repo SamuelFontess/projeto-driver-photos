@@ -9,6 +9,8 @@ export { ApiError } from './client';
 export type {
   RegisterData,
   LoginData,
+  ForgotPasswordData,
+  ResetPasswordData,
   AuthResponse,
   User,
   UpdateProfilePayload,
@@ -38,6 +40,8 @@ const api = {
   register: auth.register,
   login: auth.login,
   loginWithGoogle: auth.loginWithGoogle,
+  forgotPassword: auth.forgotPassword,
+  resetPassword: auth.resetPassword,
   getMe: auth.getMe,
   updateProfile: auth.updateProfile,
   getFolders: folders.getFolders,
