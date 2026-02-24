@@ -39,10 +39,8 @@ if (envFileFromArg) {
 }
 
 async function bootstrap() {
-  const { ensureUploadDir } = await import('./lib/uploads');
   const { initFirebase } = await import('./lib/firebase');
   const { app } = await import('./app');
-  ensureUploadDir();
   initFirebase();
   const { getRedisClient } = await import('./lib/redis');
 

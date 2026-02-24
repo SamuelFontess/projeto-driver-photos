@@ -1,6 +1,3 @@
-import fs from 'fs';
-import { PASTA_UPLOAD } from '../lib/uploads';
-import path from 'path';
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
@@ -51,21 +48,6 @@ function resolveFamilyId(req: Request): string | null {
   const fromQuery = normalizeFamilyId(req.query.familyId);
   if (fromQuery) return fromQuery;
   return normalizeFamilyId(req.body?.familyId);
-}
-
-async function writeBufferToDisk(
-  userId: string,
-  buffer: Buffer,
-  filename: string
-): Promise<string> {
-  const userDir = path.join(PASTA_UPLOAD, userId);
-  if (!fs.existsSync(userDir)) {
-    fs.mkdirSync(userDir, { recursive: true });
-  }
-  const relativePath = path.join(userId, filename);
-  const absolutePath = path.join(PASTA_UPLOAD, relativePath);
-  await fs.promises.writeFile(absolutePath, buffer);
-  return relativePath;
 }
 
 export async function list(req: Request, res: Response): Promise<void> {

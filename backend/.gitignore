@@ -9,9 +9,6 @@ dist/
 .env.local
 .env.*.local
 
-# Uploads
-uploads/
-
 # Prisma
 *.db
 *.db-journal
