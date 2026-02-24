@@ -417,17 +417,6 @@ export async function preview(req: Request, res: Response): Promise<void> {
     const cached = await getPreviewFromCache(cacheKey);
 
     if (cached) {
-      await createAuditLog({
-        req,
-        action: 'file.preview',
-        resourceType: 'file',
-        resourceId: fileRecord.id,
-        metadata: {
-          source: 'redis',
-          size: cached.length,
-          mimeType,
-        },
-      });
       setPreviewHeaders(res, fileRecord.name, mimeType, cached.length);
       res.end(cached);
       return;
@@ -444,17 +433,6 @@ export async function preview(req: Request, res: Response): Promise<void> {
         try {
           const [fileBuffer] = await storageFile.download();
           await setPreviewInCache(cacheKey, fileBuffer);
-          await createAuditLog({
-            req,
-            action: 'file.preview',
-            resourceType: 'file',
-            resourceId: fileRecord.id,
-            metadata: {
-              source: 'storage-buffer',
-              size: fileBuffer.length,
-              mimeType,
-            },
-          });
           setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
           res.end(fileBuffer);
           return;
@@ -466,17 +444,6 @@ export async function preview(req: Request, res: Response): Promise<void> {
         }
       }
       setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
-      await createAuditLog({
-        req,
-        action: 'file.preview',
-        resourceType: 'file',
-        resourceId: fileRecord.id,
-        metadata: {
-          source: 'storage-stream',
-          size: fileRecord.size,
-          mimeType,
-        },
-      });
       const readStream = storageFile.createReadStream();
       readStream.on('error', (err) => {
         logger.error('File preview stream error', err);
@@ -500,29 +467,11 @@ export async function preview(req: Request, res: Response): Promise<void> {
               if (fileRecord.size <= previewCacheMaxBytes) {
                 const [fileBuffer] = await storageFile.download();
                 await setPreviewInCache(cacheKey, fileBuffer);
-                await createAuditLog({
-                  req,
-                  action: 'file.preview',
-                  resourceType: 'file',
-                  resourceId: fileRecord.id,
-                  metadata: {
-                    source: 'storage-legacy-buffer',
-                    size: fileBuffer.length,
-                    mimeType,
-                  },
-                });
                 setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
                 res.end(fileBuffer);
                 return;
               }
               setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
-              await createAuditLog({
-                req,
-                action: 'file.preview',
-                resourceType: 'file',
-                resourceId: fileRecord.id,
-                metadata: { source: 'storage-legacy-stream', size: fileRecord.size, mimeType },
-              });
               const readStream = storageFile.createReadStream();
               readStream.on('error', (err) => {
                 logger.error('File preview stream error', err);
@@ -553,17 +502,6 @@ export async function preview(req: Request, res: Response): Promise<void> {
       try {
         const fileBuffer = await fs.promises.readFile(absolutePath);
         await setPreviewInCache(cacheKey, fileBuffer);
-        await createAuditLog({
-          req,
-          action: 'file.preview',
-          resourceType: 'file',
-          resourceId: fileRecord.id,
-          metadata: {
-            source: 'disk-buffer',
-            size: fileBuffer.length,
-            mimeType,
-          },
-        });
         setPreviewHeaders(res, fileRecord.name, mimeType, fileBuffer.length);
         res.end(fileBuffer);
         return;
@@ -576,17 +514,6 @@ export async function preview(req: Request, res: Response): Promise<void> {
     }
 
     setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
-    await createAuditLog({
-      req,
-      action: 'file.preview',
-      resourceType: 'file',
-      resourceId: fileRecord.id,
-      metadata: {
-        source: 'disk-stream',
-        size: fileRecord.size,
-        mimeType,
-      },
-    });
     const stream = fs.createReadStream(absolutePath);
     stream.on('error', (err) => {
       logger.error('File preview stream error', err);
