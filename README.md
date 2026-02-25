@@ -340,7 +340,7 @@ Backend: [http://localhost:3000](http://localhost:3000)
 
 O envio de e-mails é feito por um serviço separado (`email-worker`) que consome a fila BullMQ publicada pelo backend. Isso mantém o backend sem bloqueio e permite retry automático em caso de falha.
 
-Repositório do worker: `../email-worker/`
+Repositório do worker: [repositorio (click)](https://github.com/SamuelFontess/servico-mensageria)
 
 ### Como funciona
 
@@ -372,7 +372,7 @@ SMTP_PASS=senha-de-app-16-caracteres
 SMTP_FROM=seuapp@gmail.com
 ```
 
-Veja o [README do email-worker](../email-worker/README.md) e o [guia de deploy no Railway](../email-worker/RAILWAY.md) para instruções completas.
+Veja o [README do email-worker](https://github.com/SamuelFontess/servico-mensageria)
 
 ---
 
