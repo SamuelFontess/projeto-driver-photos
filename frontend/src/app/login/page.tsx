@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -42,6 +42,8 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [googleLoading, setGoogleLoading] = useState(false);
   const showGoogleLogin = isFirebaseAuthEnabled();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard';
 
   const {
     register,
@@ -58,7 +60,7 @@ export default function LoginPage() {
         title: 'Login realizado com sucesso!',
         description: 'Redirecionando...',
       });
-      router.push('/dashboard');
+      router.push(callbackUrl);
     } catch (err: unknown) {
       toast({
         title: 'Erro ao fazer login',
@@ -156,7 +158,7 @@ export default function LoginPage() {
                         title: 'Login realizado com sucesso!',
                         description: 'Redirecionando...',
                       });
-                      router.push('/dashboard');
+                      router.push(callbackUrl);
                     } catch (err: unknown) {
                       toast({
                         title: 'Erro ao entrar com Google',

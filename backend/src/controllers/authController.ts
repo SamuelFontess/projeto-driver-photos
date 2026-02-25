@@ -6,7 +6,7 @@ import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { createAuditLog } from '../lib/auditLog';
 import { initFirebase } from '../lib/firebase';
-import { publishEmailQueueEvent } from '../lib/emailQueue';
+import { publishEmailJob } from '../lib/emailQueue';
 import * as admin from 'firebase-admin';
 
 const FORGOT_PASSWORD_SUCCESS_MESSAGE = 'If this email exists, password reset instructions were queued';
@@ -276,7 +276,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       }),
     ]);
 
-    await publishEmailQueueEvent('forgot_password', {
+    await publishEmailJob('forgot_password', {
       userId: user.id,
       email: user.email,
       token: rawToken,

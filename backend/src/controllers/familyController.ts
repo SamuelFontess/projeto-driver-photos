@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { createAuditLog } from '../lib/auditLog';
 import { getUserPrimaryEmail, hasFamilyAccess } from '../lib/familyAccess';
-import { publishEmailQueueEvent } from '../lib/emailQueue';
+import { publishEmailJob } from '../lib/emailQueue';
 
 const FAMILY_SELECT = {
   id: true,
@@ -294,13 +294,20 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
       },
     });
 
-    await publishEmailQueueEvent('family_invite', {
+    const inviter = await prisma.user.findUnique({
+      where: { id: invitedById },
+      select: { name: true, email: true },
+    });
+
+    await publishEmailJob('family_invite', {
       invitationId: invite.id,
       familyId: family.id,
       familyName: family.name,
       invitedById,
       invitedUserId: invitedUser.id,
       invitedEmail: normalizedEmail,
+      inviterName: inviter?.name ?? 'Alguém',
+      inviterEmail: inviter?.email ?? '',
     });
 
     res.status(201).json({ invitation: invite });

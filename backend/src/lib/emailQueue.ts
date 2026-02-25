@@ -1,45 +1,47 @@
-import { randomUUID } from 'crypto';
-import { getRedisClient } from './redis';
+import { Queue } from 'bullmq';
+import Redis from 'ioredis';
 import { logger } from './logger';
 
-export type EmailQueueEventType = 'family_invite' | 'forgot_password';
+export type EmailJobType = 'family_invite' | 'forgot_password';
 
-type QueueEnvelope<TPayload> = {
-  id: string;
-  type: EmailQueueEventType;
-  occurredAt: string;
-  payload: TPayload;
-};
+let emailQueue: Queue | null = null;
 
-const EMAIL_QUEUE_KEY = process.env.EMAIL_QUEUE_KEY || 'driver:email:events';
-
-export async function publishEmailQueueEvent<TPayload extends Record<string, unknown>>(
-  type: EmailQueueEventType,
-  payload: TPayload
-): Promise<void> {
-  const client = await getRedisClient();
-  if (!client) {
-    logger.warn('Email queue publish skipped because Redis is unavailable', {
-      type,
-      queueKey: EMAIL_QUEUE_KEY,
+function getQueue(): Queue {
+  if (!emailQueue) {
+    const connection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      maxRetriesPerRequest: null,
     });
-    return;
+
+    connection.on('error', (err) => {
+      logger.warn('Email queue Redis connection error', { error: err.message });
+    });
+
+    emailQueue = new Queue('email', {
+      connection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: 100,
+        removeOnFail: 500,
+      },
+    });
   }
+  return emailQueue;
+}
 
-  const event: QueueEnvelope<TPayload> = {
-    id: randomUUID(),
-    type,
-    occurredAt: new Date().toISOString(),
-    payload,
-  };
-
+export async function publishEmailJob<T extends Record<string, unknown>>(
+  type: EmailJobType,
+  payload: T,
+): Promise<string> {
   try {
-    await client.rPush(EMAIL_QUEUE_KEY, JSON.stringify(event));
+    const job = await getQueue().add(type, payload);
+    logger.info('Email job published', { type, jobId: job.id });
+    return job.id ?? '';
   } catch (error) {
-    logger.warn('Email queue publish failed', {
+    logger.warn('Email job publish failed', {
       type,
-      queueKey: EMAIL_QUEUE_KEY,
       error: error instanceof Error ? error.message : String(error),
     });
+    return '';
   }
 }
