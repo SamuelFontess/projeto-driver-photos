@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { Suspense, useCallback, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,7 +9,7 @@ import { api } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui';
 
-export default function FamilyInvitePage() {
+function FamilyInvitePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invitationId = searchParams.get('invitationId');
@@ -183,5 +183,21 @@ export default function FamilyInvitePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function FamilyInviteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+export default function FamilyInvitePage() {
+  return (
+    <Suspense fallback={<FamilyInviteFallback />}>
+      <FamilyInvitePageContent />
+    </Suspense>
   );
 }

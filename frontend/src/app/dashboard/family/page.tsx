@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/src/hooks/use-toast';
 import { FileBrowser } from '@/src/features/files/components/FileBrowser';
@@ -7,7 +8,7 @@ import { FamilyCreateCard } from '@/src/features/family/components/FamilyCreateC
 import { FamilyHeader } from '@/src/features/family/components/FamilyHeader';
 import { useFamilySelection } from '@/src/features/family/hooks/useFamilySelection';
 
-export default function FamilyPage() {
+function FamilyPageContent() {
   const { toast } = useToast();
   const {
     families,
@@ -62,5 +63,21 @@ export default function FamilyPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function FamilyPageFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+export default function FamilyPage() {
+  return (
+    <Suspense fallback={<FamilyPageFallback />}>
+      <FamilyPageContent />
+    </Suspense>
   );
 }

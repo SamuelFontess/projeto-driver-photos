@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/src/lib/api';
@@ -10,7 +10,7 @@ import { FamilyHeader } from '@/src/features/family/components/FamilyHeader';
 import { FamilyCreateCard } from '@/src/features/family/components/FamilyCreateCard';
 import { useFamilySelection } from '@/src/features/family/hooks/useFamilySelection';
 
-export default function FamilyInvitationsPage() {
+function FamilyInvitationsPageContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const {
@@ -146,5 +146,21 @@ export default function FamilyInvitationsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function FamilyInvitationsPageFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+export default function FamilyInvitationsPage() {
+  return (
+    <Suspense fallback={<FamilyInvitationsPageFallback />}>
+      <FamilyInvitationsPageContent />
+    </Suspense>
   );
 }

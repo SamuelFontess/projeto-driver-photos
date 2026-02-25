@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,7 +36,7 @@ function GoogleLogoIcon({ className }: { className?: string }) {
   );
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -195,5 +195,21 @@ export default function LoginPage() {
         </div>
       </div>
     </PublicOnlyRoute>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

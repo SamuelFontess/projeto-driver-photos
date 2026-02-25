@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/src/lib/api';
@@ -14,7 +14,7 @@ function getMemberDisplay(name: string | null, email: string): string {
   return name?.trim() || email;
 }
 
-export default function FamilyMembersPage() {
+function FamilyMembersPageContent() {
   const { toast } = useToast();
   const {
     families,
@@ -117,5 +117,21 @@ export default function FamilyMembersPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function FamilyMembersPageFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+export default function FamilyMembersPage() {
+  return (
+    <Suspense fallback={<FamilyMembersPageFallback />}>
+      <FamilyMembersPageContent />
+    </Suspense>
   );
 }

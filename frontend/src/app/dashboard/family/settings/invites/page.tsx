@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Mail } from 'lucide-react';
 import { api } from '@/src/lib/api';
@@ -19,7 +19,7 @@ import { FamilyHeader } from '@/src/features/family/components/FamilyHeader';
 import { FamilyCreateCard } from '@/src/features/family/components/FamilyCreateCard';
 import { useFamilySelection } from '@/src/features/family/hooks/useFamilySelection';
 
-export default function FamilyInvitesPage() {
+function FamilyInvitesPageContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState('');
@@ -167,5 +167,21 @@ export default function FamilyInvitesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function FamilyInvitesPageFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+export default function FamilyInvitesPage() {
+  return (
+    <Suspense fallback={<FamilyInvitesPageFallback />}>
+      <FamilyInvitesPageContent />
+    </Suspense>
   );
 }
