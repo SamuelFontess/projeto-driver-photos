@@ -1,13 +1,12 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
+import { Suspense } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui';
 import { FamilyHeader } from '@/src/features/family/components/FamilyHeader';
-import { FamilyCreateCard } from '@/src/features/family/components/FamilyCreateCard';
 import { useFamilySelection } from '@/src/features/family/hooks/useFamilySelection';
 
 function FamilyInvitationsPageContent() {
@@ -18,8 +17,6 @@ function FamilyInvitationsPageContent() {
     selectedFamilyId,
     isLoadingFamilies,
     setSelectedFamilyId,
-    createFamily,
-    isCreatingFamily,
   } = useFamilySelection();
 
   const invitationsQuery = useQuery({
@@ -50,27 +47,7 @@ function FamilyInvitationsPageContent() {
     },
   });
 
-  const filteredInvitations = useMemo(() => {
-    const invitations = invitationsQuery.data?.invitations ?? [];
-    if (!selectedFamilyId) return invitations;
-    return invitations.filter((invitation) => invitation.familyId === selectedFamilyId);
-  }, [invitationsQuery.data?.invitations, selectedFamilyId]);
-
-  const handleCreateFamily = async (name?: string) => {
-    try {
-      await createFamily(name);
-      toast({
-        title: 'Família pronta',
-        description: 'Sua família foi criada com sucesso.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Erro ao criar família',
-        description: error instanceof Error ? error.message : 'Erro ao criar família.',
-        variant: 'destructive',
-      });
-    }
-  };
+  const invitations = invitationsQuery.data?.invitations ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -87,10 +64,8 @@ function FamilyInvitationsPageContent() {
         {isLoadingFamilies ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando famílias...
+            Carregando...
           </div>
-        ) : !selectedFamilyId ? (
-          <FamilyCreateCard onCreateFamily={handleCreateFamily} isCreating={isCreatingFamily} />
         ) : (
           <Card>
             <CardHeader>
@@ -103,11 +78,11 @@ function FamilyInvitationsPageContent() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Carregando convites...
                 </div>
-              ) : filteredInvitations.length === 0 ? (
+              ) : invitations.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Você não possui convites pendentes.</p>
               ) : (
                 <div className="space-y-3">
-                  {filteredInvitations.map((invitation) => (
+                  {invitations.map((invitation) => (
                     <div
                       key={invitation.id}
                       className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"

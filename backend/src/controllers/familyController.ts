@@ -37,16 +37,6 @@ export async function createFamily(req: Request, res: Response): Promise<void> {
     const { name } = req.body as { name?: string };
     const normalizedName = typeof name === 'string' && name.trim() ? name.trim() : null;
 
-    const existing = await prisma.family.findUnique({
-      where: { ownerId },
-      select: FAMILY_SELECT,
-    });
-
-    if (existing) {
-      res.status(200).json({ family: existing });
-      return;
-    }
-
     const family = await prisma.family.create({
       data: {
         ownerId,
@@ -267,7 +257,51 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
     });
 
     if (existing) {
-      res.status(409).json({ error: 'User already invited or already a member' });
+      if (existing.status === 'accepted') {
+        res.status(409).json({ error: 'User is already a member of this family' });
+        return;
+      }
+      // pending ou declined: atualizar registro e reenviar convite
+      const invite = await prisma.familyMember.update({
+        where: { id: existing.id },
+        data: {
+          status: 'pending',
+          invitedById,
+          invitedAt: new Date(),
+        },
+        select: FAMILY_MEMBER_SELECT,
+      });
+
+      await createAuditLog({
+        req,
+        action: 'family.invite',
+        resourceType: 'family_member',
+        resourceId: invite.id,
+        userId: invitedById,
+        metadata: {
+          familyId,
+          invitedEmail: normalizedEmail,
+          resent: true,
+        },
+      });
+
+      const inviter = await prisma.user.findUnique({
+        where: { id: invitedById },
+        select: { name: true, email: true },
+      });
+
+      await publishEmailJob('family_invite', {
+        invitationId: invite.id,
+        familyId: family.id,
+        familyName: family.name,
+        invitedById,
+        invitedUserId: invitedUser.id,
+        invitedEmail: normalizedEmail,
+        inviterName: inviter?.name ?? 'Alguém',
+        inviterEmail: inviter?.email ?? '',
+      });
+
+      res.status(200).json({ invitation: invite });
       return;
     }
 

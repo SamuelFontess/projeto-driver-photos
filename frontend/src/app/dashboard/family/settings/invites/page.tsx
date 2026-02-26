@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, Suspense, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Mail } from 'lucide-react';
+import { Loader2, Mail, Plus } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
 import {
@@ -23,19 +23,44 @@ function FamilyInvitesPageContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState('');
+  const [familyName, setFamilyName] = useState('');
   const {
     families,
     selectedFamilyId,
+    selectedFamily,
     isLoadingFamilies,
     setSelectedFamilyId,
     createFamily,
     isCreatingFamily,
   } = useFamilySelection();
 
+  useEffect(() => {
+    setFamilyName(selectedFamily?.name ?? '');
+  }, [selectedFamily]);
+
   const membersQuery = useQuery({
     queryKey: ['family-members', selectedFamilyId],
     queryFn: () => api.getFamilyMembers(selectedFamilyId as string),
     enabled: Boolean(selectedFamilyId),
+  });
+
+  const updateFamily = useMutation({
+    mutationFn: ({ familyId, name }: { familyId: string; name: string | null }) =>
+      api.updateFamily(familyId, name),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['families'] });
+      toast({
+        title: 'Família atualizada',
+        description: 'As informações da família foram salvas.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao atualizar família',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
   const inviteMember = useMutation({
@@ -79,6 +104,29 @@ function FamilyInvitesPageContent() {
     }
   };
 
+  const handleCreateNewFamily = async () => {
+    try {
+      await createFamily();
+      toast({
+        title: 'Nova família criada',
+        description: 'Uma nova família foi criada.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar família',
+        description: error instanceof Error ? error.message : 'Erro ao criar família.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdateFamily = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedFamilyId) return;
+    const trimmed = familyName.trim();
+    updateFamily.mutate({ familyId: selectedFamilyId, name: trimmed || null });
+  };
+
   const handleInvite = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedFamilyId) return;
@@ -108,6 +156,33 @@ function FamilyInvitesPageContent() {
           <FamilyCreateCard onCreateFamily={handleCreateFamily} isCreating={isCreatingFamily} />
         ) : (
           <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações da família</CardTitle>
+                <CardDescription>Edite o nome e as informações da família selecionada.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateFamily} className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="family-name">Nome da família</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="family-name"
+                        type="text"
+                        value={familyName}
+                        onChange={(event) => setFamilyName(event.target.value)}
+                        placeholder="Nome da família (opcional)"
+                        maxLength={120}
+                      />
+                      <Button type="submit" disabled={updateFamily.isPending}>
+                        {updateFamily.isPending ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Convidar membro</CardTitle>
@@ -161,6 +236,28 @@ function FamilyInvitesPageContent() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Nova família</CardTitle>
+                <CardDescription>Crie uma família adicional para gerenciar outros grupos.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  onClick={handleCreateNewFamily}
+                  disabled={isCreatingFamily}
+                  className="gap-2"
+                >
+                  {isCreatingFamily ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Criar nova família
+                </Button>
               </CardContent>
             </Card>
           </div>

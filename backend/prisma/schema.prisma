@@ -71,7 +71,7 @@ enum FamilyMemberStatus {
 model Family {
   id        String   @id @default(uuid())
   name      String?
-  ownerId   String   @unique
+  ownerId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   owner     User     @relation("FamilyOwner", fields: [ownerId], references: [id], onDelete: Cascade)

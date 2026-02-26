@@ -94,6 +94,19 @@ export async function replyFamilyInvitation(
   );
 }
 
+export async function updateFamily(
+  familyId: string,
+  name: string | null
+): Promise<{ family: FamilySummary }> {
+  return request<{ family: FamilySummary }>(
+    `/api/families/${encodeURIComponent(familyId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }
+  );
+}
+
 export async function getFamilyMembers(
   familyId: string
 ): Promise<{ family: FamilyWithOwner; members: FamilyMember[] }> {

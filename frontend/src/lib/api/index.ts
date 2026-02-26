@@ -59,6 +59,7 @@ const api = {
   getFilePreviewBlob: files.getFilePreviewBlob,
   createFamily: families.createFamily,
   getFamilies: families.getFamilies,
+  updateFamily: families.updateFamily,
   inviteFamilyMember: families.inviteFamilyMember,
   getFamilyInvitations: families.getFamilyInvitations,
   replyFamilyInvitation: families.replyFamilyInvitation,
