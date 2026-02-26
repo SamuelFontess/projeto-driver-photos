@@ -60,6 +60,8 @@ const api = {
   createFamily: families.createFamily,
   getFamilies: families.getFamilies,
   updateFamily: families.updateFamily,
+  deleteFamily: families.deleteFamily,
+  removeFamilyMember: families.removeFamilyMember,
   inviteFamilyMember: families.inviteFamilyMember,
   getFamilyInvitations: families.getFamilyInvitations,
   replyFamilyInvitation: families.replyFamilyInvitation,

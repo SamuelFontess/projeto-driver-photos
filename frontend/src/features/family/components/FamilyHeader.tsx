@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Settings, Users } from 'lucide-react';
+import { Plus, Settings, Users } from 'lucide-react';
 import {
   Button,
   DropdownMenu,
@@ -24,6 +24,7 @@ interface FamilyHeaderProps {
   families: FamilySummary[];
   selectedFamilyId: string | null;
   onFamilyChange: (familyId: string) => void;
+  onCreateFamily?: () => void;
   showSettingsMenu?: boolean;
   showBackToFiles?: boolean;
 }
@@ -48,6 +49,7 @@ export function FamilyHeader({
   families,
   selectedFamilyId,
   onFamilyChange,
+  onCreateFamily,
   showSettingsMenu = true,
   showBackToFiles = false,
 }: FamilyHeaderProps) {
@@ -81,11 +83,18 @@ export function FamilyHeader({
               <SelectContent>
                 {families.map((family) => (
                   <SelectItem key={family.id} value={family.id}>
-                  {getFamilyLabel(family)}
+                    {getFamilyLabel(family)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          ) : null}
+
+          {onCreateFamily ? (
+            <Button variant="outline" size="sm" onClick={onCreateFamily} className="gap-1">
+              <Plus className="h-4 w-4" />
+              Nova família
+            </Button>
           ) : null}
 
           {showBackToFiles ? (
@@ -103,21 +112,11 @@ export function FamilyHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Configurações</DropdownMenuLabel>
+                <DropdownMenuLabel>Família</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href={withFamilyId('/dashboard/family/settings/invites', selectedFamilyId)}>
-                    Convidar membros
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={withFamilyId('/dashboard/family/settings/invitations', selectedFamilyId)}>
-                    Convites pendentes
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={withFamilyId('/dashboard/family/settings/members', selectedFamilyId)}>
-                    Membros
+                  <Link href={withFamilyId('/dashboard/family/settings', selectedFamilyId)}>
+                    Configurações
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>

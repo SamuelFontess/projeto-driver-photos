@@ -36,6 +36,19 @@ function FamilyPageContent() {
     }
   };
 
+  const handleCreateNewFamily = async () => {
+    try {
+      await createFamily();
+      toast({ title: 'Nova família criada', description: 'Uma nova família foi criada.' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar família',
+        description: error instanceof Error ? error.message : 'Erro ao criar família.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <FamilyHeader
@@ -48,6 +61,7 @@ function FamilyPageContent() {
         families={families}
         selectedFamilyId={selectedFamilyId}
         onFamilyChange={setSelectedFamilyId}
+        onCreateFamily={handleCreateNewFamily}
       />
 
       <div className="flex-1 overflow-y-auto p-6">

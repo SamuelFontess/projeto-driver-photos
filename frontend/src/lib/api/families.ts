@@ -94,6 +94,19 @@ export async function replyFamilyInvitation(
   );
 }
 
+export async function deleteFamily(familyId: string): Promise<void> {
+  return request<void>(`/api/families/${encodeURIComponent(familyId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function removeFamilyMember(familyId: string, userId: string): Promise<void> {
+  return request<void>(
+    `/api/families/${encodeURIComponent(familyId)}/members/${encodeURIComponent(userId)}`,
+    { method: 'DELETE' }
+  );
+}
+
 export async function updateFamily(
   familyId: string,
   name: string | null

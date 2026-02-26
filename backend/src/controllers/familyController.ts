@@ -182,6 +182,17 @@ export async function deleteFamily(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const acceptedMembersCount = await prisma.familyMember.count({
+      where: { familyId, status: 'accepted' },
+    });
+
+    if (acceptedMembersCount > 0) {
+      res.status(409).json({
+        error: 'Family still has accepted members. Remove all members before deleting.',
+      });
+      return;
+    }
+
     await prisma.family.delete({
       where: { id: familyId },
     });
