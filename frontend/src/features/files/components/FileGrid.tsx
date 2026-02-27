@@ -33,7 +33,7 @@ export function FileGrid({
     <div className="space-y-6">
       {folders.length > 0 && (
         <div>
-          <h2 className="mb-4 text-lg font-semibold">Pastas</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pastas</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {folders.map((folder) => (
               <FolderCard
@@ -51,7 +51,7 @@ export function FileGrid({
 
       {files.length > 0 && (
         <div>
-          <h2 className="mb-4 text-lg font-semibold">Arquivos</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Arquivos</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {files.map((file) => (
               <FileCard

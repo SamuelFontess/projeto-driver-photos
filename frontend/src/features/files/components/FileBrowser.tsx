@@ -14,6 +14,7 @@ import { UploadZone } from './UploadZone';
 import { FilePreviewModal } from './FilePreviewModal';
 import { Header } from '@/src/components/layout/header';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { Search, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -45,13 +46,15 @@ import { api } from '@/src/lib/api';
 interface FileBrowserProps {
   scope?: FileBrowserScope;
   basePath?: string;
+  showTopHeader?: boolean;
+  familyName?: string;
 }
 
 function resolveFamilyId(scope: FileBrowserScope): string | undefined {
   return scope.type === 'family' ? scope.familyId : undefined;
 }
 
-export function FileBrowser({ scope = { type: 'user' }, basePath }: FileBrowserProps) {
+export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader = true, familyName }: FileBrowserProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentFolderId = searchParams.get('folder') || null;
@@ -282,21 +285,50 @@ export function FileBrowser({ scope = { type: 'user' }, basePath }: FileBrowserP
 
   return (
     <div className="flex flex-col h-full">
-      <Header
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        breadcrumbs={breadcrumb}
-        onBreadcrumbClick={handleBreadcrumbClick}
-      />
-      <div className="flex-1 overflow-y-auto p-6">
-        <p className="text-lg font-semibold text-foreground mb-1">
-          Olá, {displayName}!
-        </p>
-        <p className="text-sm text-muted-foreground mb-6">
-          {scope.type === 'family'
-            ? 'Gerencie as pastas e arquivos compartilhados da família.'
-            : 'Gerencie suas pastas e arquivos abaixo.'}
-        </p>
+      {showTopHeader ? (
+        <Header
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          breadcrumbs={breadcrumb}
+          onBreadcrumbClick={handleBreadcrumbClick}
+        />
+      ) : (
+        /* Sub-bar compacta para contexto de família */
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b bg-background shrink-0">
+          {scope.type === 'family' && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Users className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium truncate max-w-[120px]">
+                {familyName ?? 'Família'}
+              </span>
+            </div>
+          )}
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar arquivos e pastas..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        {showTopHeader && (
+          <p className="text-base font-semibold text-foreground mb-0.5">
+            Olá, {displayName}!
+          </p>
+        )}
+        {showTopHeader && (
+          <p className="text-xs text-muted-foreground mb-3 sm:mb-5 hidden sm:block">
+            {scope.type === 'family'
+              ? 'Gerencie as pastas e arquivos compartilhados da família.'
+              : 'Gerencie suas pastas e arquivos abaixo.'}
+          </p>
+        )}
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">

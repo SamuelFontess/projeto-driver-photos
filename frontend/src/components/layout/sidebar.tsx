@@ -15,6 +15,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 const navItems = [
   { name: 'Início', href: '/dashboard', icon: LayoutDashboard },
@@ -26,7 +27,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const router = useRouter();
-  const { isExpanded, toggle } = useSidebar();
+  const { isExpanded, toggle, isMobileOpen, closeMobile } = useSidebar();
+
+  // Close mobile sidebar on navigation
+  useEffect(() => {
+    closeMobile();
+  }, [pathname, closeMobile]);
 
   const handleLogout = () => {
     logout();
@@ -38,147 +44,162 @@ export function Sidebar() {
     : user?.email?.[0]?.toUpperCase() ?? 'U';
 
   return (
-    <aside
-      className={cn(
-        'flex h-full flex-col border-r border-border bg-card shrink-0 overflow-hidden',
-        'transition-[width] duration-200 ease-in-out',
-        'fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto',
-        isExpanded ? 'w-60' : 'w-16'
+    <>
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
       )}
-    >
-      {/* Logo + expand/collapse */}
-      <div
+
+      <aside
         className={cn(
-          'flex shrink-0 border-b border-border',
-          isExpanded
-            ? 'h-14 flex-row items-center justify-between gap-2 px-4'
-            : 'flex-col items-center justify-center gap-3 py-4 min-h-[4.5rem]'
+          'flex h-full flex-col border-r border-border bg-card shrink-0 overflow-hidden',
+          'transition-[width,transform] duration-200 ease-in-out',
+          // Desktop: relative, no translate
+          'md:relative md:inset-auto md:z-auto md:translate-x-0',
+          // Mobile: fixed, slides in/out
+          'fixed inset-y-0 left-0 z-50',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          isExpanded ? 'w-60' : 'md:w-16 w-60'
         )}
       >
-        <Link
-          href="/dashboard"
+        {/* Logo + expand/collapse */}
+        <div
           className={cn(
-            'flex items-center min-w-0 overflow-hidden',
-            isExpanded ? 'shrink' : 'shrink-0 justify-center'
+            'flex shrink-0 border-b border-border',
+            isExpanded
+              ? 'h-14 sm:h-16 flex-row items-center justify-between gap-2 px-4'
+              : 'md:flex-col md:items-center md:justify-center md:gap-3 md:py-5 md:min-h-[4.5rem] h-14 sm:h-16 flex-row items-center justify-between gap-2 px-4'
           )}
         >
-          <HardDrive className="h-7 w-7 shrink-0 text-primary" />
-          <span
+          <Link
+            href="/dashboard"
             className={cn(
-              'font-semibold text-lg text-foreground truncate whitespace-nowrap transition-all duration-200 overflow-hidden',
-              isExpanded ? 'ml-3 opacity-100 max-w-[120px]' : 'ml-0 max-w-0 opacity-0'
+              'flex items-center min-w-0 overflow-hidden',
+              isExpanded ? 'shrink' : 'md:shrink-0 md:justify-center shrink'
             )}
           >
-            Driver
-          </span>
-        </Link>
-        <button
-          type="button"
-          onClick={toggle}
-          className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-          aria-label={isExpanded ? 'Recolher menu' : 'Expandir menu'}
-        >
-          {isExpanded ? (
-            <PanelLeftClose className="h-5 w-5" />
-          ) : (
-            <PanelLeftOpen className="h-5 w-5" />
-          )}
-        </button>
-      </div>
-
-      {/* Nav */}
-      <nav className={cn(
-        'flex-1 space-y-0.5',
-        isExpanded ? 'py-4' : 'pt-6 pb-4'
-      )}>
-        {navItems.map((item) => {
-          const isActive =
-            item.href === '/dashboard/family'
-              ? pathname.startsWith('/dashboard/family')
-              : pathname === item.href;
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              title={!isExpanded ? item.name : undefined}
+            <HardDrive className="h-7 w-7 shrink-0 text-primary" />
+            <span
               className={cn(
-                'flex items-center gap-3 rounded-none py-3 text-sm font-medium transition-colors',
-                'relative border-l-[3px] border-transparent',
-                isExpanded ? 'px-4 pl-4' : 'justify-center px-0',
-                isActive
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
+                'font-semibold text-lg text-foreground truncate whitespace-nowrap transition-all duration-200 overflow-hidden',
+                isExpanded
+                  ? 'ml-3 opacity-100 max-w-[120px]'
+                  : 'md:ml-0 md:max-w-0 md:opacity-0 ml-3 opacity-100 max-w-[120px]'
               )}
-              style={!isExpanded && isActive ? { paddingLeft: '1.5px' } : undefined}
             >
-              <item.icon className={cn('h-5 w-5 shrink-0', isActive && 'text-primary')} />
-              <span
+              Driver
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={toggle}
+            className="hidden md:block shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            aria-label={isExpanded ? 'Recolher menu' : 'Expandir menu'}
+          >
+            {isExpanded ? (
+              <PanelLeftClose className="h-5 w-5" />
+            ) : (
+              <PanelLeftOpen className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className={cn(
+          'flex-1 space-y-0.5',
+          isExpanded ? 'py-4' : 'md:pt-6 md:pb-4 py-4'
+        )}>
+          {navItems.map((item) => {
+            const isActive =
+              item.href === '/dashboard/family'
+                ? pathname.startsWith('/dashboard/family')
+                : pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                title={!isExpanded ? item.name : undefined}
                 className={cn(
-                  'truncate whitespace-nowrap transition-all duration-200',
-                  isExpanded ? 'opacity-100 w-auto' : 'w-0 overflow-hidden opacity-0'
+                  'flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors',
+                  isExpanded ? 'mx-2 px-3' : 'md:justify-center md:px-2 md:mx-1 mx-2 px-3',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
                 )}
               >
-                {item.name}
-              </span>
-            </Link>
-          );
-        })}
-        <button
-          type="button"
-          onClick={handleLogout}
-          title={!isExpanded ? 'Sair' : undefined}
-          className={cn(
-            'flex w-full items-center gap-3 rounded-none py-3 text-sm font-medium transition-colors',
-            'border-l-[3px] border-transparent text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
-            isExpanded ? 'px-4 pl-4' : 'justify-center px-0'
-          )}
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          <span
+                <item.icon className={cn('h-5 w-5 shrink-0', isActive && 'text-primary')} />
+                <span
+                  className={cn(
+                    'truncate whitespace-nowrap transition-all duration-200',
+                    isExpanded ? 'opacity-100 w-auto' : 'md:w-0 md:overflow-hidden md:opacity-0 opacity-100 w-auto'
+                  )}
+                >
+                  {item.name}
+                </span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={handleLogout}
+            title={!isExpanded ? 'Sair' : undefined}
             className={cn(
-              'truncate whitespace-nowrap transition-all duration-200',
-              isExpanded ? 'opacity-100 w-auto' : 'w-0 overflow-hidden opacity-0'
+              'flex w-full items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors',
+              'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
+              isExpanded ? 'mx-2 px-3' : 'md:justify-center md:px-2 md:mx-1 mx-2 px-3'
             )}
           >
-            Sair
-          </span>
-        </button>
-      </nav>
+            <LogOut className="h-5 w-5 shrink-0" />
+            <span
+              className={cn(
+                'truncate whitespace-nowrap transition-all duration-200',
+                isExpanded ? 'opacity-100 w-auto' : 'md:w-0 md:overflow-hidden md:opacity-0 opacity-100 w-auto'
+              )}
+            >
+              Sair
+            </span>
+          </button>
+        </nav>
 
-      {/* User block */}
-      <div className={cn(
-        'border-t border-border shrink-0',
-        isExpanded ? 'px-4 pt-4 pb-4' : 'p-2'
-      )}>
-        <Link
-          href="/dashboard/profile"
-          title={!isExpanded ? (user?.name || 'Perfil') : undefined}
-          className={cn(
-            'flex items-center rounded-md transition-colors hover:bg-accent/50',
-            isExpanded ? 'gap-3 p-1 -m-1' : 'justify-center p-1'
-          )}
-        >
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-primary text-xs font-medium text-primary-foreground"
-            aria-hidden
-          >
-            {initials}
-          </div>
-          <div
+        {/* User block */}
+        <div className={cn(
+          'border-t border-border shrink-0',
+          isExpanded ? 'px-4 pt-4 pb-4' : 'md:p-2 px-4 pt-4 pb-4'
+        )}>
+          <Link
+            href="/dashboard/profile"
+            title={!isExpanded ? (user?.name || 'Perfil') : undefined}
             className={cn(
-              'min-w-0 flex-1 overflow-hidden transition-all duration-200',
-              isExpanded ? 'opacity-100' : 'w-0 opacity-0'
+              'flex items-center rounded-md transition-colors hover:bg-accent/50',
+              isExpanded ? 'gap-3 p-1 -m-1' : 'md:justify-center md:p-1 gap-3 p-1 -m-1'
             )}
           >
-            <p className="truncate text-sm font-semibold text-foreground whitespace-nowrap">
-              {user?.name || 'Usuário'}
-            </p>
-            <p className="truncate text-[11px] text-muted-foreground whitespace-nowrap">
-              {user?.email ?? 'usuario@email.com'}
-            </p>
-          </div>
-        </Link>
-      </div>
-    </aside>
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-primary text-xs font-medium text-primary-foreground"
+              aria-hidden
+            >
+              {initials}
+            </div>
+            <div
+              className={cn(
+                'min-w-0 flex-1 overflow-hidden transition-all duration-200',
+                isExpanded ? 'opacity-100' : 'md:w-0 md:opacity-0 opacity-100'
+              )}
+            >
+              <p className="truncate text-sm font-semibold text-foreground whitespace-nowrap">
+                {user?.name || 'Usuário'}
+              </p>
+              <p className="truncate text-[11px] text-muted-foreground whitespace-nowrap">
+                {user?.email ?? 'usuario@email.com'}
+              </p>
+            </div>
+          </Link>
+        </div>
+      </aside>
+    </>
   );
 }

@@ -49,7 +49,7 @@ export function UploadZone({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'relative min-h-[400px] transition-all',
+        'relative transition-all',
         isDragging && 'bg-primary/5 border-primary border-2 border-dashed rounded-lg'
       )}
     >

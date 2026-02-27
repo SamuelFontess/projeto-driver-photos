@@ -198,7 +198,7 @@ function FamilySettingsPageContent() {
         showBackToFiles
       />
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {isLoadingFamilies ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -343,9 +343,9 @@ function FamilySettingsPageContent() {
                           Aguardando resposta
                         </p>
                         {pendingInvites.map((invite) => (
-                          <div key={invite.id} className="flex items-center justify-between rounded-md border border-dashed p-2 text-sm">
-                            <span>{invite.email}</span>
-                            <span className="text-xs text-muted-foreground">pendente</span>
+                          <div key={invite.id} className="flex items-center gap-2 rounded-md border border-dashed p-2 text-sm">
+                            <span className="flex-1 min-w-0 truncate">{invite.email}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">pendente</span>
                           </div>
                         ))}
                       </div>

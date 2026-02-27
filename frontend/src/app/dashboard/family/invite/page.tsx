@@ -70,7 +70,7 @@ function FamilyInvitePageContent() {
 
   if (!invitationId) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex py-12 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -78,7 +78,7 @@ function FamilyInvitePageContent() {
 
   if (invitationsQuery.isLoading || invitationsQuery.isFetching) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6">
+      <div className="flex py-12 flex-col items-center justify-center gap-4 p-6">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">Carregando convite...</p>
       </div>
@@ -87,7 +87,7 @@ function FamilyInvitePageContent() {
 
   if (invitationsQuery.isError) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6">
+      <div className="flex py-12 flex-col items-center justify-center gap-4 p-6">
         <p className="text-center text-sm text-muted-foreground">
           Não foi possível carregar o convite. Faça login e tente novamente.
         </p>
@@ -100,7 +100,7 @@ function FamilyInvitePageContent() {
 
   if (!invitation) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6">
+      <div className="flex py-12 flex-col items-center justify-center gap-4 p-6">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Convite não encontrado</CardTitle>
@@ -121,7 +121,7 @@ function FamilyInvitePageContent() {
 
   if (invitation.status !== 'pending') {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6">
+      <div className="flex py-12 flex-col items-center justify-center gap-4 p-6">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Convite já respondido</CardTitle>
@@ -142,7 +142,7 @@ function FamilyInvitePageContent() {
   const familyName = invitation.family?.name ?? 'Família';
 
   return (
-    <div className="flex min-h-[40vh] flex-col items-center justify-center p-6">
+    <div className="flex py-12 flex-col items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ function FamilyInvitePageContent() {
 
 function FamilyInviteFallback() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="flex py-12 items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
     </div>
   );

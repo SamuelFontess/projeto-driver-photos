@@ -64,16 +64,23 @@ function FamilyPageContent() {
         onCreateFamily={handleCreateNewFamily}
       />
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 min-h-0">
         {isLoadingFamilies ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando famílias...
           </div>
         ) : selectedFamilyId ? (
-          <FileBrowser scope={{ type: 'family', familyId: selectedFamilyId }} basePath="/dashboard/family" />
+          <FileBrowser
+            scope={{ type: 'family', familyId: selectedFamilyId }}
+            basePath="/dashboard/family"
+            showTopHeader={false}
+            familyName={selectedFamily?.name ?? undefined}
+          />
         ) : (
-          <FamilyCreateCard onCreateFamily={handleCreateFamily} isCreating={isCreatingFamily} />
+          <div className="p-4 sm:p-6">
+            <FamilyCreateCard onCreateFamily={handleCreateFamily} isCreating={isCreatingFamily} />
+          </div>
         )}
       </div>
     </div>

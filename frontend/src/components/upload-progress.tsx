@@ -16,7 +16,7 @@ export function UploadProgress() {
   const successCount = uploads.filter((u) => u.status === 'success').length;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 shadow-lg">
+    <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 sm:w-80 shadow-lg">
       <Card>
         <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">

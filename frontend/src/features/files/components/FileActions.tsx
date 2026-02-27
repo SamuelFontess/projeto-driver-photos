@@ -51,16 +51,16 @@ export function FileActions({
 
   return (
     <div className="flex items-center gap-2">
-      <Button onClick={onUploadClick} size="sm">
-        <Upload className="mr-2 h-4 w-4" />
-        Enviar arquivos
+      <Button onClick={onUploadClick} size="sm" aria-label="Enviar arquivos">
+        <Upload className="h-4 w-4 sm:mr-2" />
+        <span className="hidden sm:inline">Enviar arquivos</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            Nova pasta
+          <Button variant="outline" size="sm" aria-label="Nova pasta">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nova pasta</span>
           </Button>
         </DialogTrigger>
         <DialogContent>

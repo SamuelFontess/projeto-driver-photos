@@ -114,7 +114,7 @@ export function FilePreviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl w-full h-[80vh] flex flex-col">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-4xl h-[85dvh] sm:h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 truncate">
             {file.name}
