@@ -540,13 +540,16 @@ export async function removeMember(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (family.ownerId !== userId) {
-      res.status(403).json({ error: 'Only owner can remove members' });
+    const isSelf = memberUserId === userId;
+    const isOwnerActing = family.ownerId === userId;
+
+    if (!isSelf && !isOwnerActing) {
+      res.status(403).json({ error: 'Only the owner can remove other members' });
       return;
     }
 
     if (memberUserId === family.ownerId) {
-      res.status(400).json({ error: 'Owner cannot be removed from family' });
+      res.status(400).json({ error: 'Owner cannot leave the family' });
       return;
     }
 
@@ -569,7 +572,7 @@ export async function removeMember(req: Request, res: Response): Promise<void> {
 
     await createAuditLog({
       req,
-      action: 'family.member.remove',
+      action: isSelf ? 'family.member.leave' : 'family.member.remove',
       resourceType: 'family_member',
       resourceId: member.id,
       userId,

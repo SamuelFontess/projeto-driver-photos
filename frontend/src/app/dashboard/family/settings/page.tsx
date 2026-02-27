@@ -408,42 +408,82 @@ function FamilySettingsPageContent() {
               </CardContent>
             </Card>
 
-            {/* Seção 4: Zona de perigo (apenas owner) */}
-            {isOwner ? (
-              <Card className="border-destructive/40">
+            {/* Seção 4: Zona de perigo */}
+            <Card className="border-destructive/40">
                 <CardHeader>
                   <CardTitle className="text-destructive">Zona de perigo</CardTitle>
                   <CardDescription>Ações irreversíveis para esta família.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="gap-2" disabled={deleteFamily.isPending}>
-                        <Trash2 className="h-4 w-4" />
-                        Excluir família
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir família</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação é permanente e não pode ser desfeita. Para excluir, a família não pode ter membros aceitos — remova todos antes de continuar.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() => deleteFamily.mutate(selectedFamilyId)}
-                        >
-                          Excluir permanentemente
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                <CardContent className="flex flex-wrap gap-3">
+                  {/* Sair da família (apenas membros, não owner) */}
+                  {!isOwner && user ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="gap-2 border-destructive text-destructive hover:bg-destructive/10">
+                          <UserMinus className="h-4 w-4" />
+                          Sair da família
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Sair da família</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja sair desta família? Você perderá acesso a todos os arquivos compartilhados e precisará de um novo convite para entrar novamente.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() =>
+                              removeMember.mutate(
+                                { familyId: selectedFamilyId, userId: user.id },
+                                {
+                                  onSuccess: async () => {
+                                    await queryClient.invalidateQueries({ queryKey: ['families'] });
+                                    router.push('/dashboard/family');
+                                  },
+                                }
+                              )
+                            }
+                          >
+                            Sair da família
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null}
+
+                  {/* Excluir família (apenas owner) */}
+                  {isOwner ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="gap-2" disabled={deleteFamily.isPending}>
+                          <Trash2 className="h-4 w-4" />
+                          Excluir família
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir família</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação é permanente e não pode ser desfeita. Para excluir, a família não pode ter membros aceitos — remova todos antes de continuar.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => deleteFamily.mutate(selectedFamilyId)}
+                          >
+                            Excluir permanentemente
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null}
                 </CardContent>
-              </Card>
-            ) : null}
+            </Card>
 
           </div>
         )}
