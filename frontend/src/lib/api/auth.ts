@@ -38,6 +38,7 @@ export interface User {
   name?: string;
   createdAt?: string;
   updatedAt?: string;
+  isAdmin?: boolean;
 }
 
 export async function register(data: RegisterData): Promise<AuthResponse> {

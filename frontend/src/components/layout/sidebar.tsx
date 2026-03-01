@@ -13,6 +13,7 @@ import {
   HardDrive,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -143,6 +144,29 @@ export function Sidebar() {
               </Link>
             );
           })}
+          {user?.isAdmin && (
+            <Link
+              href="/dashboard/admin"
+              title={!isExpanded ? 'Admin' : undefined}
+              className={cn(
+                'flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors',
+                isExpanded ? 'mx-2 px-3' : 'md:justify-center md:px-2 md:mx-1 mx-2 px-3',
+                pathname === '/dashboard/admin'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
+              )}
+            >
+              <ShieldCheck className={cn('h-5 w-5 shrink-0', pathname === '/dashboard/admin' && 'text-primary')} />
+              <span
+                className={cn(
+                  'truncate whitespace-nowrap transition-all duration-200',
+                  isExpanded ? 'opacity-100 w-auto' : 'md:w-0 md:overflow-hidden md:opacity-0 opacity-100 w-auto'
+                )}
+              >
+                Admin
+              </span>
+            </Link>
+          )}
           <button
             type="button"
             onClick={handleLogout}

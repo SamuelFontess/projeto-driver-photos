@@ -4,6 +4,7 @@ import * as auth from './auth';
 import * as folders from './folders';
 import * as files from './files';
 import * as families from './families';
+import * as admin from './admin';
 export { ApiError } from './client';
 
 export type {
@@ -36,6 +37,8 @@ export type {
   FamilyWithOwner,
 } from './families';
 
+export type { SendAdminEmailPayload } from './admin';
+
 const api = {
   register: auth.register,
   login: auth.login,
@@ -66,6 +69,7 @@ const api = {
   getFamilyInvitations: families.getFamilyInvitations,
   replyFamilyInvitation: families.replyFamilyInvitation,
   getFamilyMembers: families.getFamilyMembers,
+  sendAdminEmail: admin.sendAdminEmail,
 };
 
 export { api };
