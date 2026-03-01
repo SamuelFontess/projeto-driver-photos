@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { apiReference } from '@scalar/express-api-reference';
 import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
 import fileRoutes from './routes/fileRoutes';
@@ -7,6 +8,7 @@ import familyRoutes from './routes/familyRoutes';
 import adminRoutes from './routes/adminRoutes';
 import { logger } from './lib/logger';
 import { files_request_limit, max_upload_file_size_bytes } from './lib/multer';
+import { openApiSpec } from './docs/openapi';
 
 export const app = express();
 
@@ -23,6 +25,48 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
+
+// Documentação da API (Scalar) — protegida por Basic Auth
+function docsBasicAuth(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const user = process.env.DOCS_USER;
+  const pass = process.env.DOCS_PASSWORD;
+
+  if (!user || !pass) {
+    res.status(503).json({ error: 'Docs not available' });
+    return;
+  }
+
+  const authorization = req.headers.authorization ?? '';
+  const [scheme, encoded] = authorization.split(' ');
+
+  if (scheme !== 'Basic' || !encoded) {
+    res.set('WWW-Authenticate', 'Basic realm="API Docs"');
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  const [reqUser, reqPass] = Buffer.from(encoded, 'base64').toString().split(':');
+
+  if (reqUser !== user || reqPass !== pass) {
+    res.set('WWW-Authenticate', 'Basic realm="API Docs"');
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  next();
+}
+
+app.get('/api-docs/spec.json', docsBasicAuth, (_req, res) => {
+  res.json(openApiSpec);
+});
+app.use(
+  '/api-docs',
+  docsBasicAuth,
+  apiReference({
+    spec: { content: openApiSpec },
+    theme: 'default',
+  })
+);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/families', familyRoutes);
