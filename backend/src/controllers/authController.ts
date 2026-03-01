@@ -396,7 +396,13 @@ export async function me(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.json({ user });
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const isAdmin = adminEmails.includes(user.email.toLowerCase());
+
+    res.json({ user: { ...user, isAdmin } });
   } catch (error) {
     logger.error('Me error', error);
     res.status(500).json({ error: 'Internal server error' });

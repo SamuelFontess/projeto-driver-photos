@@ -4,6 +4,7 @@ import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
 import fileRoutes from './routes/fileRoutes';
 import familyRoutes from './routes/familyRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { logger } from './lib/logger';
 import { files_request_limit, max_upload_file_size_bytes } from './lib/multer';
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/families', familyRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware (multer/fileFilter errors → 400)
 app.use(
