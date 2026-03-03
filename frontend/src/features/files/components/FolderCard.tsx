@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, MoreVertical, ChevronRight } from 'lucide-react';
+import { Folder, MoreVertical } from 'lucide-react';
 import { Button } from '@/src/components/ui';
 import {
   DropdownMenu,
@@ -28,7 +28,14 @@ export function FolderCard({
   onDelete,
 }: FolderCardProps) {
   return (
-    <div className="group relative flex items-center gap-2 sm:gap-4 rounded-lg border bg-card px-3 py-2.5 sm:p-4 hover:bg-accent/50 transition-colors w-full overflow-hidden">
+    <div
+      className="group relative flex items-center gap-2 sm:gap-4 rounded-lg border bg-card px-3 py-2.5 sm:p-4 hover:bg-accent/60 hover:shadow-sm transition-all cursor-pointer w-full overflow-hidden"
+      onClick={() => onEnter(folder)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onEnter(folder)}
+      aria-label={`Abrir pasta ${folder.name}`}
+    >
       <div className="shrink-0">
         <Folder className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
       </div>
@@ -39,31 +46,27 @@ export function FolderCard({
         </p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 sm:h-8 sm:w-8"
-          onClick={() => onEnter(folder)}
-          aria-label="Abrir pasta"
-        >
-          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 sm:h-8 sm:w-8"
+              onClick={(e) => e.stopPropagation()}
+            >
               <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onRename(folder)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRename(folder); }}>
               Renomear
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onMove(folder)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onMove(folder); }}>
               Mover
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => onDelete(folder)}
+              onClick={(e) => { e.stopPropagation(); onDelete(folder); }}
               className="text-destructive"
             >
               Excluir

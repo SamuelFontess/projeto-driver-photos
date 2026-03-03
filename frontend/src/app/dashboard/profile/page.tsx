@@ -2,17 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { useSidebar } from '@/src/contexts/SidebarContext';
 import { api, type UpdateProfilePayload } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@/src/components/ui';
-import { Loader2, User, Lock, Menu } from 'lucide-react';
+import { Loader2, User, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { profilePasswordSchema } from '@/src/features/auth/schemas';
+import { Header } from '@/src/components/layout/header';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
-  const { toggleMobile } = useSidebar();
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -102,19 +101,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={toggleMobile}
-            className="md:hidden shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-            aria-label="Abrir menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <h1 className="text-base sm:text-lg font-semibold">Perfil</h1>
-        </div>
-      </header>
+      <Header breadcrumbs={[{ id: null, name: 'Perfil' }]} />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="mx-auto max-w-2xl space-y-6">

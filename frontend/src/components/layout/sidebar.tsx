@@ -167,17 +167,24 @@ export function Sidebar() {
               </span>
             </Link>
           )}
+        </nav>
+
+        {/* Logout — isolado acima do perfil */}
+        <div className={cn(
+          'shrink-0 border-t border-border',
+          isExpanded ? 'px-2 py-2' : 'md:px-1 px-2 py-2'
+        )}>
           <button
             type="button"
             onClick={handleLogout}
             title={!isExpanded ? 'Sair' : undefined}
             className={cn(
-              'flex w-full items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors',
-              'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
-              isExpanded ? 'mx-2 px-3' : 'md:justify-center md:px-2 md:mx-1 mx-2 px-3'
+              'flex w-full items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors',
+              'text-muted-foreground hover:bg-destructive/10 hover:text-destructive',
+              isExpanded ? 'px-3' : 'md:justify-center md:px-2 px-3'
             )}
           >
-            <LogOut className="h-5 w-5 shrink-0" />
+            <LogOut className="h-4 w-4 shrink-0" />
             <span
               className={cn(
                 'truncate whitespace-nowrap transition-all duration-200',
@@ -187,7 +194,7 @@ export function Sidebar() {
               Sair
             </span>
           </button>
-        </nav>
+        </div>
 
         {/* User block */}
         <div className={cn(
@@ -203,7 +210,7 @@ export function Sidebar() {
             )}
           >
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-primary text-xs font-medium text-primary-foreground"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-medium text-primary-foreground"
               aria-hidden
             >
               {initials}

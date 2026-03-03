@@ -318,12 +318,12 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {showTopHeader && (
-          <p className="text-base font-semibold text-foreground mb-0.5">
+          <p className="text-xl font-bold text-foreground mb-0.5">
             Olá, {displayName}!
           </p>
         )}
         {showTopHeader && (
-          <p className="text-xs text-muted-foreground mb-3 sm:mb-5 hidden sm:block">
+          <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
             {scope.type === 'family'
               ? 'Gerencie as pastas e arquivos compartilhados da família.'
               : 'Gerencie suas pastas e arquivos abaixo.'}
@@ -374,6 +374,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                     onFilePreview={handlePreview}
                     onFileDelete={handleFileDelete}
                     downloadingFileId={downloadFile.isPending ? 'pending' : null}
+                    onUploadClick={handleUploadClick}
                   />
                 ) : (
                   <FileList
@@ -387,6 +388,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                     onFilePreview={handlePreview}
                     onFileDelete={handleFileDelete}
                     downloadingFileId={downloadFile.isPending ? 'pending' : null}
+                    onUploadClick={handleUploadClick}
                   />
                 )}
               </>

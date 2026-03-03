@@ -72,8 +72,8 @@ function LoginPageContent() {
 
   return (
     <PublicOnlyRoute>
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="w-full max-w-[440px] space-y-8 px-6 py-10 sm:p-12">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/40">
+        <div className="w-full max-w-[440px] space-y-8 rounded-2xl border bg-card shadow-sm px-6 py-10 sm:p-12">
           <div className="flex items-center gap-3">
             <HardDrive className="h-7 w-7 text-primary" />
             <span className="font-semibold text-lg text-foreground">Driver</span>
@@ -200,7 +200,7 @@ function LoginPageContent() {
 
 function LoginFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-muted/40">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );

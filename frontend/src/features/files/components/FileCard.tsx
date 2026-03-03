@@ -1,6 +1,6 @@
 'use client';
 
-import { File, Download, MoreVertical, Eye } from 'lucide-react';
+import { Download, MoreVertical, Eye } from 'lucide-react';
 import { Button } from '@/src/components/ui';
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 import { type FolderFile } from '@/src/lib/api';
 import { formatFileSize, formatDateShort } from '../utils/formatters';
+import { getFileIconConfig } from '../utils/fileIcons';
 
 interface FileCardProps {
   file: FolderFile;
@@ -21,13 +22,14 @@ interface FileCardProps {
 }
 
 export function FileCard({ file, onDownload, onPreview, onDelete, isDownloading }: FileCardProps) {
+  const { icon: FileIcon, className: iconClass } = getFileIconConfig(file.mimeType);
   return (
-    <div className="group relative flex items-center gap-2 sm:gap-4 rounded-lg border bg-card px-3 py-2.5 sm:p-4 hover:bg-accent/50 transition-colors w-full overflow-hidden">
+    <div className="group relative flex items-center gap-2 sm:gap-4 rounded-lg border bg-card px-3 py-2.5 sm:p-4 hover:bg-accent/60 hover:shadow-sm transition-all w-full overflow-hidden">
       <div
         className="shrink-0 cursor-pointer"
         onClick={() => onPreview(file)}
       >
-        <File className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+        <FileIcon className={`h-6 w-6 sm:h-8 sm:w-8 ${iconClass}`} />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden cursor-pointer" onClick={() => onPreview(file)}>
         <h3 className="text-sm font-medium truncate" title={file.name}>

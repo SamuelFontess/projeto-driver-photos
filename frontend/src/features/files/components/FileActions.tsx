@@ -99,12 +99,14 @@ export function FileActions({
         </DialogContent>
       </Dialog>
 
-      <div className="ml-auto flex items-center gap-1 border rounded-md">
+      <div className="ml-auto flex items-center gap-0.5 rounded-lg bg-muted p-1" role="group" aria-label="Modo de visualização">
         <Button
           variant={viewMode === 'grid' ? 'default' : 'ghost'}
           size="sm"
           onClick={() => onViewModeChange('grid')}
-          className="rounded-r-none"
+          aria-pressed={viewMode === 'grid'}
+          aria-label="Visualização em grade"
+          className="h-7 w-7 p-0 rounded-md"
         >
           <Grid3x3 className="h-4 w-4" />
         </Button>
@@ -112,7 +114,9 @@ export function FileActions({
           variant={viewMode === 'list' ? 'default' : 'ghost'}
           size="sm"
           onClick={() => onViewModeChange('list')}
-          className="rounded-l-none"
+          aria-pressed={viewMode === 'list'}
+          aria-label="Visualização em lista"
+          className="h-7 w-7 p-0 rounded-md"
         >
           <List className="h-4 w-4" />
         </Button>

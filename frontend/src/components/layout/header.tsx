@@ -57,7 +57,7 @@ export function Header({
 
         <div className="ml-auto flex flex-1 items-center gap-2 sm:gap-4 justify-end">
           {onSearchChange && (
-            <div className="relative flex-1 max-w-[140px] sm:max-w-sm">
+            <div className="relative flex-1 max-w-[200px] sm:max-w-sm">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
