@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, File as FileIcon, Download, MoreVertical, Eye, FolderOpen, Upload } from 'lucide-react';
+import { Folder, Download, MoreVertical, Eye, FolderOpen, Upload } from 'lucide-react';
 import { Button } from '@/src/components/ui';
 import {
   DropdownMenu,
