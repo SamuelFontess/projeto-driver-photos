@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 
 type SidebarContextValue = {
   isExpanded: boolean;

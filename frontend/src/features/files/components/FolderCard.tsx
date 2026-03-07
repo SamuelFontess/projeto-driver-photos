@@ -33,11 +33,11 @@ export function FolderCard({
       onClick={() => onEnter(folder)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onEnter(folder)}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onEnter(folder)}
       aria-label={`Abrir pasta ${folder.name}`}
     >
       <div className="shrink-0">
-        <Folder className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+        <Folder className="h-6 w-6 sm:h-8 sm:w-8 text-primary" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <h3 className="text-sm font-medium truncate">{folder.name}</h3>
@@ -53,8 +53,9 @@ export function FolderCard({
               size="icon"
               className="h-7 w-7 sm:h-8 sm:w-8"
               onClick={(e) => e.stopPropagation()}
+              aria-label="Mais opções"
             >
-              <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

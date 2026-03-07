@@ -35,10 +35,10 @@ export function Header({
         </button>
 
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 overflow-hidden">
+          <nav aria-label="Localização atual" className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 overflow-hidden">
             {breadcrumbs.map((item, i) => (
               <div key={item.id ?? 'root'} className="flex items-center gap-2 shrink-0">
-                {i > 0 && <span>/</span>}
+                {i > 0 && <span aria-hidden="true">/</span>}
                 {i === breadcrumbs.length - 1 ? (
                   <span className="font-semibold text-foreground truncate max-w-[120px] sm:max-w-none">{item.name}</span>
                 ) : (
@@ -58,9 +58,12 @@ export function Header({
         <div className="ml-auto flex flex-1 items-center gap-2 sm:gap-4 justify-end">
           {onSearchChange && (
             <div className="relative flex-1 max-w-[200px] sm:max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 type="search"
+                name="search"
+                autoComplete="off"
+                aria-label="Buscar arquivos e pastas"
                 placeholder="Buscar..."
                 value={searchValue}
                 onChange={(e) => onSearchChange(e.target.value)}

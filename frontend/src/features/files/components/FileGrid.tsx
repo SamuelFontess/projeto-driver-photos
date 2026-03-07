@@ -1,8 +1,8 @@
 'use client';
 
-import { FolderOpen, Upload } from 'lucide-react';
 import { FolderCard } from './FolderCard';
 import { FileCard } from './FileCard';
+import { EmptyFolderState } from './EmptyFolderState';
 import { type Folder, type FolderFile } from '@/src/lib/api';
 
 interface FileGridProps {
@@ -75,25 +75,7 @@ export function FileGrid({
       )}
 
       {folders.length === 0 && files.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-            <FolderOpen className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <p className="text-base font-medium text-foreground">Esta pasta está vazia</p>
-          <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-            Arraste arquivos para cá ou use o botão para começar.
-          </p>
-          {onUploadClick && (
-            <button
-              type="button"
-              onClick={onUploadClick}
-              className="mt-5 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              <Upload className="h-4 w-4" />
-              Enviar arquivo
-            </button>
-          )}
-        </div>
+        <EmptyFolderState onUploadClick={onUploadClick} />
       )}
     </div>
   );

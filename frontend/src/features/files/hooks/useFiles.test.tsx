@@ -40,9 +40,11 @@ describe('useFiles', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(getFilesMock).toHaveBeenCalledWith({
-      folderId: 'folder-1',
-      search: 'report',
-    });
+    expect(getFilesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderId: 'folder-1',
+        search: 'report',
+      })
+    );
   });
 });

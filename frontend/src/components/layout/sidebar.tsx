@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useSidebar } from '@/src/contexts/SidebarContext';
 import { cn } from '@/src/lib/utils';
@@ -15,7 +15,6 @@ import {
   PanelLeftOpen,
   ShieldCheck,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 const navItems = [
@@ -78,12 +77,13 @@ export function Sidebar() {
         >
           <Link
             href="/dashboard"
+            aria-label={isExpanded ? undefined : 'Driver — ir para início'}
             className={cn(
               'flex items-center min-w-0 overflow-hidden',
               isExpanded ? 'shrink' : 'md:shrink-0 md:justify-center shrink'
             )}
           >
-            <HardDrive className="h-7 w-7 shrink-0 text-primary" />
+            <HardDrive className="h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
             <span
               className={cn(
                 'font-semibold text-lg text-foreground truncate whitespace-nowrap transition-all duration-200 overflow-hidden',
@@ -102,9 +102,9 @@ export function Sidebar() {
             aria-label={isExpanded ? 'Recolher menu' : 'Expandir menu'}
           >
             {isExpanded ? (
-              <PanelLeftClose className="h-5 w-5" />
+              <PanelLeftClose className="h-5 w-5" aria-hidden="true" />
             ) : (
-              <PanelLeftOpen className="h-5 w-5" />
+              <PanelLeftOpen className="h-5 w-5" aria-hidden="true" />
             )}
           </button>
         </div>
@@ -184,7 +184,7 @@ export function Sidebar() {
               isExpanded ? 'px-3' : 'md:justify-center md:px-2 px-3'
             )}
           >
-            <LogOut className="h-4 w-4 shrink-0" />
+            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span
               className={cn(
                 'truncate whitespace-nowrap transition-all duration-200',
