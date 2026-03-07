@@ -16,6 +16,9 @@ const prismaMock = {
     findMany: vi.fn(),
     count: vi.fn(),
   },
+  auditLog: {
+    create: vi.fn().mockResolvedValue(undefined),
+  },
 };
 
 vi.mock('./lib/prisma', () => ({
@@ -36,6 +39,7 @@ describe('Routes integration', () => {
     prismaMock.file.count.mockResolvedValue(0);
     prismaMock.folder.findMany.mockResolvedValue([]);
     prismaMock.file.findMany.mockResolvedValue([]);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
   });
 
   it('POST /api/auth/register returns 201 on success', async () => {
