@@ -4,13 +4,15 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFiles } from '../hooks/useFiles';
 import { useFolders } from '../hooks/useFolders';
-import { useUpdateFolder, useDeleteFolder } from '../hooks/useFolderActions';
+import { useUpdateFolder, useDeleteFolder, useToggleFavoriteFolder } from '../hooks/useFolderActions';
+import { useFavoriteFolders } from '../hooks/useFavoriteFolders';
 import { useUploadFiles, useDownloadFile, useDeleteFile } from '../hooks/useFileActions';
 import { useDialogState } from '../hooks/useDialogState';
 import { FileActions } from './FileActions';
 import { BreadcrumbNav } from './BreadcrumbNav';
 import { FileGrid } from './FileGrid';
 import { FileList } from './FileList';
+import { FavoriteFoldersSection } from './FavoriteFoldersSection';
 import { UploadZone } from './UploadZone';
 import { FilePreviewModal } from './FilePreviewModal';
 import { Header } from '@/src/components/layout/header';
@@ -84,6 +86,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
   // Mutations
   const updateFolder = useUpdateFolder(scope);
   const deleteFolder = useDeleteFolder(scope);
+  const toggleFavorite = useToggleFavoriteFolder(scope);
   const deleteFile = useDeleteFile(scope);
   const uploadFiles = useUploadFiles(scope);
   const downloadFile = useDownloadFile(scope);
@@ -93,6 +96,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
   const folders = useMemo(() => foldersData?.folders ?? [], [foldersData]);
   const files = useMemo(() => filesData?.files ?? [], [filesData]);
   const isLoading = foldersLoading || filesLoading;
+  const togglingFavoriteId = toggleFavorite.isPending ? (toggleFavorite.variables ?? null) : null;
 
   // Sync breadcrumb with current folder
   useEffect(() => {
@@ -132,6 +136,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
     [folders, normalizedSearchQuery]
   );
   const filteredFiles = useMemo(() => files, [files]);
+  const favoriteFolders = useFavoriteFolders(filteredFolders);
 
   const handleEnterFolder = useCallback((folder: Folder) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -232,6 +237,10 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
     });
     dialogs.move.close();
   }, [dialogs.move, updateFolder]);
+
+  const handleToggleFavorite = useCallback((folder: Folder) => {
+    toggleFavorite.mutate(folder.id);
+  }, [toggleFavorite]);
 
   const handleDelete = useCallback((folder: Folder) => {
     dialogs.deleteFolder.open(folder);
@@ -359,7 +368,17 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                 <Skeleton className="h-20 w-full" />
               </div>
             ) : (
-              <>
+              <div className="space-y-6">
+                <FavoriteFoldersSection
+                  folders={favoriteFolders}
+                  viewMode={viewMode}
+                  onEnter={handleEnterFolder}
+                  onRename={handleRename}
+                  onMove={handleMove}
+                  onDelete={handleDelete}
+                  onToggleFavorite={handleToggleFavorite}
+                  togglingFavoriteId={togglingFavoriteId}
+                />
                 {viewMode === 'grid' ? (
                   <FileGrid
                     folders={filteredFolders}
@@ -368,10 +387,12 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                     onFolderRename={handleRename}
                     onFolderMove={handleMove}
                     onFolderDelete={handleDelete}
+                    onFolderToggleFavorite={handleToggleFavorite}
                     onFileDownload={handleDownload}
                     onFilePreview={handlePreview}
                     onFileDelete={handleFileDelete}
                     downloadingFileId={downloadFile.isPending ? (downloadFile.variables ?? null) : null}
+                    togglingFavoriteId={togglingFavoriteId}
                     onUploadClick={handleUploadClick}
                   />
                 ) : (
@@ -382,14 +403,16 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                     onFolderRename={handleRename}
                     onFolderMove={handleMove}
                     onFolderDelete={handleDelete}
+                    onFolderToggleFavorite={handleToggleFavorite}
                     onFileDownload={handleDownload}
                     onFilePreview={handlePreview}
                     onFileDelete={handleFileDelete}
                     downloadingFileId={downloadFile.isPending ? (downloadFile.variables ?? null) : null}
+                    togglingFavoriteId={togglingFavoriteId}
                     onUploadClick={handleUploadClick}
                   />
                 )}
-              </>
+              </div>
             )}
           </UploadZone>
         </div>
