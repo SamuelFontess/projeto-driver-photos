@@ -52,6 +52,8 @@ const api = {
   updateFolder: folders.updateFolder,
   getFolder: folders.getFolder,
   deleteFolder: folders.deleteFolder,
+  toggleFavoriteFolder: folders.toggleFavoriteFolder,
+  getFavoriteFolders: folders.getFavoriteFolders,
   getFiles: files.getFiles,
   getFile: files.getFile,
   updateFile: files.updateFile,

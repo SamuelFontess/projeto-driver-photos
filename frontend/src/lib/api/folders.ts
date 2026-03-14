@@ -10,6 +10,7 @@ export interface Folder {
   updatedAt: string;
   childrenCount?: number;
   filesCount?: number;
+  isFavorited?: boolean;
 }
 
 export interface CreateFolderPayload {
@@ -119,4 +120,24 @@ export async function deleteFolder(
   await request<void>(`/api/folders/${encodeURIComponent(id)}${query ? `?${query}` : ''}`, {
     method: 'DELETE',
   });
+}
+
+export async function toggleFavoriteFolder(id: string): Promise<{ isFavorited: boolean }> {
+  return request<{ isFavorited: boolean }>(
+    `/api/folders/${encodeURIComponent(id)}/favorite`,
+    { method: 'POST' }
+  );
+}
+
+export async function getFavoriteFolders(
+  scope: FolderScopeParams = {}
+): Promise<{ folders: Folder[] }> {
+  const { familyId } = scope;
+  const params = new URLSearchParams();
+  if (familyId) params.set('familyId', familyId);
+  const query = params.toString();
+  return request<{ folders: Folder[] }>(
+    `/api/folders/favorites${query ? `?${query}` : ''}`,
+    { method: 'GET' }
+  );
 }
