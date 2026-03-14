@@ -80,3 +80,29 @@ export function useDeleteFolder(scope: FileBrowserScope) {
     },
   });
 }
+
+export function useToggleFavoriteFolder(scope: FileBrowserScope) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const familyId = resolveFamilyId(scope);
+
+  return useMutation({
+    mutationFn: (folderId: string) => api.toggleFavoriteFolder(folderId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['folders', scope.type, familyId ?? null] });
+      toast({
+        title: data.isFavorited ? 'Adicionado aos favoritos' : 'Removido dos favoritos',
+        description: data.isFavorited
+          ? 'Pasta adicionada aos favoritos.'
+          : 'Pasta removida dos favoritos.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao atualizar favoritos',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
