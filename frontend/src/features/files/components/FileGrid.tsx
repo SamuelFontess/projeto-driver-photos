@@ -12,10 +12,12 @@ interface FileGridProps {
   onFolderRename: (folder: Folder) => void;
   onFolderMove: (folder: Folder) => void;
   onFolderDelete: (folder: Folder) => void;
+  onFolderToggleFavorite: (folder: Folder) => void;
   onFileDownload: (file: FolderFile) => void;
   onFilePreview: (file: FolderFile) => void;
   onFileDelete: (file: FolderFile) => void;
   downloadingFileId?: string | null;
+  togglingFavoriteId?: string | null;
   onUploadClick?: () => void;
 }
 
@@ -26,10 +28,12 @@ export function FileGrid({
   onFolderRename,
   onFolderMove,
   onFolderDelete,
+  onFolderToggleFavorite,
   onFileDownload,
   onFilePreview,
   onFileDelete,
   downloadingFileId,
+  togglingFavoriteId,
   onUploadClick,
 }: FileGridProps) {
   return (
@@ -48,6 +52,8 @@ export function FileGrid({
                 onRename={onFolderRename}
                 onMove={onFolderMove}
                 onDelete={onFolderDelete}
+                onToggleFavorite={onFolderToggleFavorite}
+                isTogglingFavorite={togglingFavoriteId === folder.id}
               />
             ))}
           </div>
