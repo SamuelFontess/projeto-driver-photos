@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { list, create, get, remove, update } from '../controllers/folderController';
+import { toggleFavorite, getFavorites } from '../controllers/favoriteFolderController';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import {
@@ -15,6 +16,10 @@ const router = Router();
 // Todas as rotas de pastas exigem autenticação
 router.get('/', authenticate, validate(folderListQuerySchema, 'query'), list);
 router.post('/', authenticate, validate(createFolderSchema), create);
+
+router.get('/favorites', authenticate, validate(folderScopeQuerySchema, 'query'), getFavorites);
+router.post('/:id/favorite', authenticate, validate(folderIdParamSchema, 'params'), toggleFavorite);
+
 router.get(
   '/:id',
   authenticate,

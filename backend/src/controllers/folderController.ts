@@ -38,21 +38,29 @@ export async function list(req: Request, res: Response): Promise<void> {
       }
     }
 
-    const folders = await prisma.folder.findMany({
-      where: {
-        ...(familyId ? {} : { userId }),
-        familyId: familyId ?? null,
-        parentId: isRoot ? null : parentId,
-      },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        parentId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const [folders, favoriteRows] = await Promise.all([
+      prisma.folder.findMany({
+        where: {
+          ...(familyId ? {} : { userId }),
+          familyId: familyId ?? null,
+          parentId: isRoot ? null : parentId,
+        },
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          parentId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.favoriteFolder.findMany({
+        where: { userId },
+        select: { folderId: true },
+      }),
+    ]);
+
+    const favoriteIds = new Set(favoriteRows.map((f) => f.folderId));
 
     // Adiciona contagens de filhos e arquivos para cada pasta
     const foldersWithCounts = await Promise.all(
@@ -78,6 +86,7 @@ export async function list(req: Request, res: Response): Promise<void> {
           ...folder,
           childrenCount,
           filesCount,
+          isFavorited: favoriteIds.has(folder.id),
         };
       })
     );
@@ -242,7 +251,12 @@ export async function get(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.json({ folder });
+    const isFavoritedRow = await prisma.favoriteFolder.findUnique({
+      where: { userId_folderId: { userId, folderId: id } },
+      select: { id: true },
+    });
+
+    res.json({ folder: { ...folder, isFavorited: isFavoritedRow !== null } });
   } catch (error) {
     logger.error('Folder get error', error);
     res.status(500).json({ error: 'Internal server error' });
