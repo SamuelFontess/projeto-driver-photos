@@ -1,21 +1,27 @@
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { useFiles } from './useFiles';
-import { api } from '@/src/lib/api';
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { useFiles } from "./useFiles";
+import { api } from "@/src/lib/api";
 
-vi.mock('@/src/lib/api', () => ({
+vi.mock("@/src/lib/api", () => ({
   api: {
     getFiles: vi.fn(),
   },
 }));
 
-describe('useFiles', () => {
-  it('requests files using folder and search params', async () => {
+describe("useFiles", () => {
+  it("requests files using folder and search params", async () => {
     const getFilesMock = vi.mocked(api.getFiles);
-    getFilesMock.mockResolvedValue({ files: [] });
+    getFilesMock.mockResolvedValue({
+      files: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+      totalPages: 0,
+    });
 
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -30,10 +36,10 @@ describe('useFiles', () => {
     );
 
     const { result } = renderHook(
-      () => useFiles('folder-1', { type: 'user' }, 'report'),
+      () => useFiles("folder-1", { type: "user" }, "report"),
       {
-      wrapper,
-      }
+        wrapper,
+      },
     );
 
     await waitFor(() => {
@@ -42,9 +48,9 @@ describe('useFiles', () => {
 
     expect(getFilesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        folderId: 'folder-1',
-        search: 'report',
-      })
+        folderId: "folder-1",
+        search: "report",
+      }),
     );
   });
 });
