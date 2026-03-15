@@ -1,20 +1,20 @@
-import { Request, Response } from 'express';
-import { randomUUID } from 'crypto';
-import { prisma } from '../lib/prisma';
-import { logger } from '../lib/logger';
-import { isAllowedUploadMimeType, max_upload_file_size_bytes } from '../lib/multer';
-import { createAuditLog } from '../lib/auditLog';
-import { getFirebaseBucket } from '../lib/firebase';
-import { requireFamilyAccess } from '../lib/familyAccess';
+import { Request, Response } from "express";
+import { randomUUID } from "crypto";
+import { prisma } from "../lib/prisma";
+import { logger } from "../lib/logger";
+import { isAllowedUploadMimeType, max_upload_file_size_bytes } from "../lib/multer";
+import { createAuditLog } from "../lib/auditLog";
+import { getFirebaseBucket } from "../lib/firebase";
+import { requireFamilyAccess } from "../lib/familyAccess";
 import {
   getPreviewFromCache,
   previewCacheMaxBytes,
   previewMaxBytes,
   setPreviewInCache,
-} from '../lib/redis';
+} from "../lib/redis";
 
 function isStoragePath(filePath: string): boolean {
-  return filePath.startsWith('users/');
+  return filePath.startsWith("users/");
 }
 
 function getLegacyStoragePath(diskPath: string): string | null {
@@ -23,7 +23,7 @@ function getLegacyStoragePath(diskPath: string): string | null {
 }
 
 function sanitizeStorageName(name: string): string {
-  return (name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').trim() || 'file';
+  return (name || "file").replace(/[^a-zA-Z0-9._-]/g, "_").trim() || "file";
 }
 
 const CAMPOS_ARQUIVO = {
@@ -38,9 +38,9 @@ const CAMPOS_ARQUIVO = {
 } as const;
 
 function normalizeFamilyId(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== "string") return null;
   const normalized = value.trim();
-  if (!normalized || normalized.toLowerCase() === 'null') return null;
+  if (!normalized || normalized.toLowerCase() === "null") return null;
   return normalized;
 }
 
@@ -54,16 +54,16 @@ export async function list(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
     const folderIdParam = req.query.folderId as string | undefined;
     const familyId = resolveFamilyId(req);
     const searchParam =
-      typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+      typeof req.query.search === "string" ? req.query.search.trim() : undefined;
     const isRoot =
-      folderIdParam === undefined || folderIdParam === '' || folderIdParam === 'null';
+      folderIdParam === undefined || folderIdParam === "" || folderIdParam === "null";
 
     if (familyId) {
       const familyAccess = await requireFamilyAccess(userId, familyId);
@@ -80,7 +80,7 @@ export async function list(req: Request, res: Response): Promise<void> {
             familyId: familyId ?? null,
             name: {
               contains: searchParam,
-              mode: 'insensitive' as const,
+              mode: "insensitive" as const,
             },
           }
         : {
@@ -91,14 +91,14 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     const files = await prisma.file.findMany({
       where: whereClause,
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
       select: CAMPOS_ARQUIVO,
     });
 
     res.json({ files });
   } catch (error) {
-    logger.error('File list error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("File list error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -106,13 +106,13 @@ export async function upload(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {
-      res.status(400).json({ error: 'No files provided' });
+      res.status(400).json({ error: "No files provided" });
       return;
     }
 
@@ -143,14 +143,14 @@ export async function upload(req: Request, res: Response): Promise<void> {
     }
 
     let folderId: string | null = null;
-    if (folderIdParam != null && folderIdParam !== '') {
+    if (folderIdParam != null && folderIdParam !== "") {
       const folder = await prisma.folder.findFirst({
         where: familyId
           ? { id: folderIdParam, familyId }
           : { id: folderIdParam, userId, familyId: null },
       });
       if (!folder) {
-        res.status(404).json({ error: 'Folder not found' });
+        res.status(404).json({ error: "Folder not found" });
         return;
       }
       folderId = folderIdParam;
@@ -158,7 +158,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
 
     const bucket = getFirebaseBucket();
     if (!bucket) {
-      res.status(503).json({ error: 'Storage unavailable' });
+      res.status(503).json({ error: "Storage unavailable" });
       return;
     }
     const created: Array<{
@@ -173,14 +173,14 @@ export async function upload(req: Request, res: Response): Promise<void> {
     }> = [];
 
     for (const file of files) {
-      const name = (file.originalname || 'file').trim();
+      const name = (file.originalname || "file").trim();
       if (!name) continue;
 
       const fileId = randomUUID();
-      const mimeType = file.mimetype || 'application/octet-stream';
+      const mimeType = file.mimetype || "application/octet-stream";
       const buffer = file.buffer;
       if (!buffer) {
-        logger.warn('Upload file missing buffer', { originalname: file.originalname });
+        logger.warn("Upload file missing buffer", { originalname: file.originalname });
         continue;
       }
 
@@ -211,8 +211,8 @@ export async function upload(req: Request, res: Response): Promise<void> {
       created.map((record) =>
         createAuditLog({
           req,
-          action: 'file.upload',
-          resourceType: 'file',
+          action: "file.upload",
+          resourceType: "file",
           resourceId: record.id,
           metadata: {
             name: record.name,
@@ -226,8 +226,8 @@ export async function upload(req: Request, res: Response): Promise<void> {
 
     res.status(201).json({ files: created });
   } catch (error) {
-    logger.error('File upload error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("File upload error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -236,7 +236,7 @@ export async function download(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -256,21 +256,21 @@ export async function download(req: Request, res: Response): Promise<void> {
     });
 
     if (!fileRecord) {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
-    const safeName = fileRecord.name.replace(/[^\x20-\x7E]/g, '_');
-    res.setHeader('Content-Type', fileRecord.mimeType);
+    const safeName = fileRecord.name.replace(/[^\x20-\x7E]/g, "_");
+    res.setHeader("Content-Type", fileRecord.mimeType);
     res.setHeader(
-      'Content-Disposition',
+      "Content-Disposition",
       `attachment; filename="${safeName.replace(/"/g, '\\"')}"`
     );
 
     await createAuditLog({
       req,
-      action: 'file.download',
-      resourceType: 'file',
+      action: "file.download",
+      resourceType: "file",
       resourceId: id,
       metadata: {
         mimeType: fileRecord.mimeType,
@@ -280,7 +280,7 @@ export async function download(req: Request, res: Response): Promise<void> {
 
     const bucket = getFirebaseBucket();
     if (!bucket) {
-      res.status(503).json({ error: 'Storage unavailable' });
+      res.status(503).json({ error: "Storage unavailable" });
       return;
     }
     const storagePath = isStoragePath(fileRecord.path)
@@ -288,9 +288,9 @@ export async function download(req: Request, res: Response): Promise<void> {
       : getLegacyStoragePath(fileRecord.path);
     if (!storagePath) {
       res.status(404).json({
-        error: 'File not found',
-        code: 'LEGACY_FILE_UNAVAILABLE',
-        message: 'File was stored locally and is no longer available.',
+        error: "File not found",
+        code: "LEGACY_FILE_UNAVAILABLE",
+        message: "File was stored locally and is no longer available.",
       });
       return;
     }
@@ -299,30 +299,30 @@ export async function download(req: Request, res: Response): Promise<void> {
       const [exists] = await storageFile.exists();
       if (!exists) {
         res.status(404).json({
-          error: 'File not found',
-          code: 'LEGACY_FILE_UNAVAILABLE',
-          message: 'File was stored locally and is no longer available.',
+          error: "File not found",
+          code: "LEGACY_FILE_UNAVAILABLE",
+          message: "File was stored locally and is no longer available.",
         });
         return;
       }
       const readStream = storageFile.createReadStream();
-      readStream.on('error', (err) => {
-        logger.error('File stream error', err);
-        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+      readStream.on("error", (err) => {
+        logger.error("File stream error", err);
+        if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
         else res.end();
       });
       readStream.pipe(res);
     } catch {
       res.status(404).json({
-        error: 'File not found',
-        code: 'LEGACY_FILE_UNAVAILABLE',
-        message: 'File was stored locally and is no longer available.',
+        error: "File not found",
+        code: "LEGACY_FILE_UNAVAILABLE",
+        message: "File was stored locally and is no longer available.",
       });
     }
   } catch (error) {
-    logger.error('File download error', error);
+    logger.error("File download error", error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 }
@@ -332,21 +332,21 @@ function getPreviewCacheKey(fileId: string): string {
 }
 
 function setPreviewHeaders(res: Response, fileName: string, mimeType: string, size: number): void {
-  const safeName = fileName.replace(/[^\x20-\x7E]/g, '_');
-  res.setHeader('Content-Type', mimeType || 'application/octet-stream');
-  res.setHeader('Content-Length', String(size));
+  const safeName = fileName.replace(/[^\x20-\x7E]/g, "_");
+  res.setHeader("Content-Type", mimeType || "application/octet-stream");
+  res.setHeader("Content-Length", String(size));
   res.setHeader(
-    'Content-Disposition',
+    "Content-Disposition",
     `inline; filename="${safeName.replace(/"/g, '\\"')}"`
   );
-  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.setHeader("Cache-Control", "private, max-age=300");
 }
 
 export async function preview(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -366,16 +366,16 @@ export async function preview(req: Request, res: Response): Promise<void> {
     });
 
     if (!fileRecord) {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
     if (fileRecord.size > previewMaxBytes) {
-      res.status(413).json({ error: 'File too large for preview' });
+      res.status(413).json({ error: "File too large for preview" });
       return;
     }
 
-    const mimeType = fileRecord.mimeType || 'application/octet-stream';
+    const mimeType = fileRecord.mimeType || "application/octet-stream";
     const cacheKey = getPreviewCacheKey(fileRecord.id);
     const cached = await getPreviewFromCache(cacheKey);
 
@@ -387,7 +387,7 @@ export async function preview(req: Request, res: Response): Promise<void> {
 
     const bucket = getFirebaseBucket();
     if (!bucket) {
-      res.status(503).json({ error: 'Storage unavailable' });
+      res.status(503).json({ error: "Storage unavailable" });
       return;
     }
     const storagePath = isStoragePath(fileRecord.path)
@@ -395,9 +395,9 @@ export async function preview(req: Request, res: Response): Promise<void> {
       : getLegacyStoragePath(fileRecord.path);
     if (!storagePath) {
       res.status(404).json({
-        error: 'File not found',
-        code: 'LEGACY_FILE_UNAVAILABLE',
-        message: 'File was stored locally and is no longer available.',
+        error: "File not found",
+        code: "LEGACY_FILE_UNAVAILABLE",
+        message: "File was stored locally and is no longer available.",
       });
       return;
     }
@@ -406,17 +406,17 @@ export async function preview(req: Request, res: Response): Promise<void> {
       const [exists] = await storageFile.exists();
       if (!exists) {
         res.status(404).json({
-          error: 'File not found',
-          code: 'LEGACY_FILE_UNAVAILABLE',
-          message: 'File was stored locally and is no longer available.',
+          error: "File not found",
+          code: "LEGACY_FILE_UNAVAILABLE",
+          message: "File was stored locally and is no longer available.",
         });
         return;
       }
     } catch {
       res.status(404).json({
-        error: 'File not found',
-        code: 'LEGACY_FILE_UNAVAILABLE',
-        message: 'File was stored locally and is no longer available.',
+        error: "File not found",
+        code: "LEGACY_FILE_UNAVAILABLE",
+        message: "File was stored locally and is no longer available.",
       });
       return;
     }
@@ -428,7 +428,7 @@ export async function preview(req: Request, res: Response): Promise<void> {
         res.end(fileBuffer);
         return;
       } catch (error) {
-        logger.warn('Preview Storage download failed, fallback to stream', {
+        logger.warn("Preview Storage download failed, fallback to stream", {
           fileId: fileRecord.id,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -436,16 +436,16 @@ export async function preview(req: Request, res: Response): Promise<void> {
     }
     setPreviewHeaders(res, fileRecord.name, mimeType, fileRecord.size);
     const readStream = storageFile.createReadStream();
-    readStream.on('error', (err) => {
-      logger.error('File preview stream error', err);
-      if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+    readStream.on("error", (err) => {
+      logger.error("File preview stream error", err);
+      if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
       else res.end();
     });
     readStream.pipe(res);
   } catch (error) {
-    logger.error('File preview error', error);
+    logger.error("File preview error", error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 }
@@ -454,7 +454,7 @@ export async function get(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -474,14 +474,14 @@ export async function get(req: Request, res: Response): Promise<void> {
     });
 
     if (!file) {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
     res.json({ file });
   } catch (error) {
-    logger.error('File get error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("File get error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -489,7 +489,7 @@ export async function update(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -514,21 +514,21 @@ export async function update(req: Request, res: Response): Promise<void> {
     });
 
     if (!file) {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
     const updateData: { name?: string; folderId?: string | null } = {};
 
     if (name !== undefined) {
-      if (typeof name !== 'string') {
-        res.status(400).json({ error: 'Name must be a string' });
+      if (typeof name !== "string") {
+        res.status(400).json({ error: "Name must be a string" });
         return;
       }
 
       const trimmedName = name.trim();
       if (!trimmedName) {
-        res.status(400).json({ error: 'Name cannot be empty' });
+        res.status(400).json({ error: "Name cannot be empty" });
         return;
       }
 
@@ -536,7 +536,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     }
 
     if (folderId !== undefined) {
-      const nextFolderId = folderId === '' || folderId === null ? null : folderId;
+      const nextFolderId = folderId === "" || folderId === null ? null : folderId;
 
       if (nextFolderId !== null) {
         const folder = await prisma.folder.findFirst({
@@ -547,7 +547,7 @@ export async function update(req: Request, res: Response): Promise<void> {
         });
 
         if (!folder) {
-          res.status(404).json({ error: 'Folder not found' });
+          res.status(404).json({ error: "Folder not found" });
           return;
         }
       }
@@ -556,7 +556,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     }
 
     if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ error: 'No fields to update' });
+      res.status(400).json({ error: "No fields to update" });
       return;
     }
 
@@ -568,8 +568,8 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     await createAuditLog({
       req,
-      action: 'file.update',
-      resourceType: 'file',
+      action: "file.update",
+      resourceType: "file",
       resourceId: updatedFile.id,
       metadata: {
         updatedFields: Object.keys(updateData),
@@ -580,8 +580,8 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     res.json({ file: updatedFile });
   } catch (error) {
-    logger.error('File update error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("File update error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -589,7 +589,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -609,7 +609,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
     });
 
     if (!file) {
-      res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
@@ -621,8 +621,8 @@ export async function remove(req: Request, res: Response): Promise<void> {
       } catch (error) {
         const err = error as { code?: number };
         if (err.code !== 404) {
-          logger.error('File delete from Storage error', error);
-          res.status(500).json({ error: 'Internal server error' });
+          logger.error("File delete from Storage error", error);
+          res.status(500).json({ error: "Internal server error" });
           return;
         }
       }
@@ -634,8 +634,8 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     await createAuditLog({
       req,
-      action: 'file.delete',
-      resourceType: 'file',
+      action: "file.delete",
+      resourceType: "file",
       resourceId: file.id,
       metadata: {
         path: file.path,
@@ -644,7 +644,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     res.status(204).send();
   } catch (error) {
-    logger.error('File remove error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("File remove error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }

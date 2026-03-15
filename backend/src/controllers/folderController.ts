@@ -1,13 +1,13 @@
-import { Request, Response } from 'express';
-import { prisma } from '../lib/prisma';
-import { logger } from '../lib/logger';
-import { createAuditLog } from '../lib/auditLog';
-import { requireFamilyAccess } from '../lib/familyAccess';
+import { Request, Response } from "express";
+import { prisma } from "../lib/prisma";
+import { logger } from "../lib/logger";
+import { createAuditLog } from "../lib/auditLog";
+import { requireFamilyAccess } from "../lib/familyAccess";
 
 function normalizeFamilyId(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== "string") return null;
   const normalized = value.trim();
-  if (!normalized || normalized.toLowerCase() === 'null') return null;
+  if (!normalized || normalized.toLowerCase() === "null") return null;
   return normalized;
 }
 
@@ -22,13 +22,13 @@ export async function list(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
     const parentId = req.query.parentId as string | undefined;
     const familyId = resolveFamilyId(req);
-    const isRoot = parentId === undefined || parentId === '' || parentId === 'null';
+    const isRoot = parentId === undefined || parentId === "" || parentId === "null";
 
     if (familyId) {
       const familyAccess = await requireFamilyAccess(userId, familyId);
@@ -45,7 +45,7 @@ export async function list(req: Request, res: Response): Promise<void> {
           familyId: familyId ?? null,
           parentId: isRoot ? null : parentId,
         },
-        orderBy: { name: 'asc' },
+        orderBy: { name: "asc" },
         select: {
           id: true,
           name: true,
@@ -93,8 +93,8 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     res.json({ folders: foldersWithCounts });
   } catch (error) {
-    logger.error('Folder list error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("Folder list error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -103,7 +103,7 @@ export async function create(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -118,23 +118,23 @@ export async function create(req: Request, res: Response): Promise<void> {
       }
     }
 
-    if (!name || typeof name !== 'string') {
-      res.status(400).json({ error: 'Name is required' });
+    if (!name || typeof name !== "string") {
+      res.status(400).json({ error: "Name is required" });
       return;
     }
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      res.status(400).json({ error: 'Name cannot be empty' });
+      res.status(400).json({ error: "Name cannot be empty" });
       return;
     }
 
-    if (parentId != null && parentId !== '') {
+    if (parentId != null && parentId !== "") {
       const parent = await prisma.folder.findFirst({
         where: familyId ? { id: parentId, familyId } : { id: parentId, userId, familyId: null },
       });
       if (!parent) {
-        res.status(404).json({ error: 'Parent folder not found' });
+        res.status(404).json({ error: "Parent folder not found" });
         return;
       }
     }
@@ -144,7 +144,7 @@ export async function create(req: Request, res: Response): Promise<void> {
         name: trimmedName,
         userId,
         familyId,
-        parentId: parentId && parentId !== '' ? parentId : null,
+        parentId: parentId && parentId !== "" ? parentId : null,
       },
       select: {
         id: true,
@@ -183,8 +183,8 @@ export async function create(req: Request, res: Response): Promise<void> {
 
     await createAuditLog({
       req,
-      action: 'folder.create',
-      resourceType: 'folder',
+      action: "folder.create",
+      resourceType: "folder",
       resourceId: folder.id,
       metadata: {
         name: folder.name,
@@ -192,8 +192,8 @@ export async function create(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    logger.error('Folder create error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("Folder create error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -202,7 +202,7 @@ export async function get(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -247,7 +247,7 @@ export async function get(req: Request, res: Response): Promise<void> {
     });
 
     if (!folder) {
-      res.status(404).json({ error: 'Folder not found' });
+      res.status(404).json({ error: "Folder not found" });
       return;
     }
 
@@ -258,8 +258,8 @@ export async function get(req: Request, res: Response): Promise<void> {
 
     res.json({ folder: { ...folder, isFavorited: isFavoritedRow !== null } });
   } catch (error) {
-    logger.error('Folder get error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("Folder get error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -268,7 +268,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -288,7 +288,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
     });
 
     if (!folder) {
-      res.status(404).json({ error: 'Folder not found' });
+      res.status(404).json({ error: "Folder not found" });
       return;
     }
 
@@ -298,8 +298,8 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     await createAuditLog({
       req,
-      action: 'folder.delete',
-      resourceType: 'folder',
+      action: "folder.delete",
+      resourceType: "folder",
       resourceId: folder.id,
       metadata: {
         name: folder.name,
@@ -309,8 +309,8 @@ export async function remove(req: Request, res: Response): Promise<void> {
 
     res.status(204).send();
   } catch (error) {
-    logger.error('Folder delete error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("Folder delete error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
@@ -364,7 +364,7 @@ export async function update(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
@@ -389,7 +389,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     });
 
     if (!folder) {
-      res.status(404).json({ error: 'Folder not found' });
+      res.status(404).json({ error: "Folder not found" });
       return;
     }
 
@@ -398,14 +398,14 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     // Valida e atualiza name se fornecido
     if (name !== undefined) {
-      if (typeof name !== 'string') {
-        res.status(400).json({ error: 'Name must be a string' });
+      if (typeof name !== "string") {
+        res.status(400).json({ error: "Name must be a string" });
         return;
       }
 
       const trimmedName = name.trim();
       if (!trimmedName) {
-        res.status(400).json({ error: 'Name cannot be empty' });
+        res.status(400).json({ error: "Name cannot be empty" });
         return;
       }
 
@@ -415,11 +415,11 @@ export async function update(req: Request, res: Response): Promise<void> {
     // Valida e atualiza parentId se fornecido
     if (parentId !== undefined) {
       // Se parentId é null ou string vazia, move para raiz
-      const newParentId = parentId === '' || parentId === null ? null : parentId;
+      const newParentId = parentId === "" || parentId === null ? null : parentId;
 
       // Não pode mover para dentro de si mesma
       if (newParentId === id) {
-        res.status(400).json({ error: 'Cannot move folder into itself' });
+        res.status(400).json({ error: "Cannot move folder into itself" });
         return;
       }
 
@@ -432,7 +432,7 @@ export async function update(req: Request, res: Response): Promise<void> {
         });
 
         if (!parent) {
-          res.status(404).json({ error: 'Parent folder not found' });
+          res.status(404).json({ error: "Parent folder not found" });
           return;
         }
 
@@ -443,7 +443,7 @@ export async function update(req: Request, res: Response): Promise<void> {
         });
         if (wouldCreateCycle) {
           res.status(400).json({
-            error: 'Cannot move folder into its own descendant',
+            error: "Cannot move folder into its own descendant",
           });
           return;
         }
@@ -454,7 +454,7 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     // Se não há nada para atualizar
     if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ error: 'No fields to update' });
+      res.status(400).json({ error: "No fields to update" });
       return;
     }
 
@@ -499,8 +499,8 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     await createAuditLog({
       req,
-      action: 'folder.update',
-      resourceType: 'folder',
+      action: "folder.update",
+      resourceType: "folder",
       resourceId: updatedFolder.id,
       metadata: {
         updatedFields: Object.keys(updateData),
@@ -509,7 +509,7 @@ export async function update(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    logger.error('Folder update error', error);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error("Folder update error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
