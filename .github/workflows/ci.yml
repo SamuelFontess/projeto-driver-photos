@@ -1,0 +1,261 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # BACKEND
+  # ─────────────────────────────────────────────
+  backend-typecheck:
+    name: "Backend · TypeScript"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Verificar tipos (tsc --noEmit)
+        run: npx tsc --noEmit
+
+  backend-test:
+    name: "Backend · Vitest"
+    runs-on: ubuntu-latest
+    needs: backend-typecheck
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driver_test
+      JWT_SECRET: ci-jwt-secret-placeholder
+      ADMIN_EMAILS: admin@test.com
+      REDIS_URL: redis://localhost:6379
+      # Firebase e Brevo não são usados nos testes — Prisma e Firebase são mockados
+      FIREBASE_PROJECT_ID: ""
+      FIREBASE_CLIENT_EMAIL: ""
+      FIREBASE_PRIVATE_KEY: ""
+      FIREBASE_STORAGE_BUCKET: ""
+      BREVO_API_KEY: ""
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: driver_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      - name: Aplicar migrations no banco de teste
+        run: npx prisma migrate deploy
+
+      - name: Rodar testes
+        run: npm test -- --reporter=verbose
+
+  # ─────────────────────────────────────────────
+  # FRONTEND
+  # ─────────────────────────────────────────────
+  frontend-typecheck:
+    name: "Frontend · TypeScript"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Verificar tipos (tsc --noEmit)
+        run: npx tsc --noEmit
+
+  frontend-test:
+    name: "Frontend · Vitest"
+    runs-on: ubuntu-latest
+    needs: frontend-typecheck
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar testes
+        run: npm test -- --reporter=verbose
+
+  # ─────────────────────────────────────────────
+  # E2E
+  # ─────────────────────────────────────────────
+  e2e:
+    name: "Frontend · E2E (Playwright)"
+    runs-on: ubuntu-latest
+    # E2E só roda depois que typecheck e unit tests do frontend passaram
+    needs: [frontend-typecheck, frontend-test]
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    env:
+      CI: "true"
+      PORT: 3005
+      # O frontend em CI não precisa de backend real.
+      # Todos os endpoints são interceptados por page.route() nos specs.
+      NEXT_PUBLIC_API_URL: http://localhost:3005
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Cache binários do Playwright
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Instalar Chromium + dependências de sistema
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # Quando há cache hit, os binários existem mas as system libs podem
+      # faltar no runner limpo — instala só as libs sem re-baixar o browser.
+      - name: Instalar dependências de sistema (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Rodar testes E2E
+        run: npx playwright test --reporter=list,html
+
+      # Artifacts só são enviados em falha para economizar storage
+      - name: Upload relatório HTML do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload screenshots e traces (falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ github.run_id }}
+          path: frontend/test-results/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────
+  # JOB AGREGADOR — usado como branch protection rule
+  # Configurar em: Settings → Branches → Require status checks → "ci / Todos os checks"
+  # ─────────────────────────────────────────────
+  all-checks:
+    name: "Todos os checks passaram"
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - backend-typecheck
+      - backend-test
+      - frontend-typecheck
+      - frontend-test
+      - e2e
+
+    steps:
+      - name: Verificar resultado de todos os jobs
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Resultados: $results"
+          for result in $results; do
+            if [ "$result" != "success" ]; then
+              echo "Um ou mais checks falharam."
+              exit 1
+            fi
+          done
+          echo "Todos os checks passaram com sucesso."
