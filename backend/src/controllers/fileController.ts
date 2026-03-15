@@ -2,7 +2,10 @@ import { Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
-import { isAllowedUploadMimeType, max_upload_file_size_bytes } from "../lib/multer";
+import {
+  isAllowedUploadMimeType,
+  max_upload_file_size_bytes,
+} from "../lib/multer";
 import { createAuditLog } from "../lib/auditLog";
 import { getFirebaseBucket } from "../lib/firebase";
 import { requireFamilyAccess } from "../lib/familyAccess";
@@ -61,9 +64,20 @@ export async function list(req: Request, res: Response): Promise<void> {
     const folderIdParam = req.query.folderId as string | undefined;
     const familyId = resolveFamilyId(req);
     const searchParam =
-      typeof req.query.search === "string" ? req.query.search.trim() : undefined;
+      typeof req.query.search === "string"
+        ? req.query.search.trim()
+        : undefined;
     const isRoot =
-      folderIdParam === undefined || folderIdParam === "" || folderIdParam === "null";
+      folderIdParam === undefined ||
+      folderIdParam === "" ||
+      folderIdParam === "null";
+
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit as string) || 50, 1),
+      200,
+    );
+    const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+    const skip = (page - 1) * limit;
 
     if (familyId) {
       const familyAccess = await requireFamilyAccess(userId, familyId);
@@ -89,13 +103,24 @@ export async function list(req: Request, res: Response): Promise<void> {
             folderId: isRoot ? null : folderIdParam,
           };
 
-    const files = await prisma.file.findMany({
-      where: whereClause,
-      orderBy: { name: "asc" },
-      select: CAMPOS_ARQUIVO,
-    });
+    const [files, total] = await prisma.$transaction([
+      prisma.file.findMany({
+        where: whereClause,
+        orderBy: { name: "asc" },
+        select: CAMPOS_ARQUIVO,
+        take: limit,
+        skip,
+      }),
+      prisma.file.count({ where: whereClause }),
+    ]);
 
-    res.json({ files });
+    res.json({
+      files,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     logger.error("File list error", error);
     res.status(500).json({ error: "Internal server error" });
@@ -116,19 +141,27 @@ export async function upload(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const invalidMimeFile = files.find((file) => !isAllowedUploadMimeType(file.mimetype));
+    const invalidMimeFile = files.find(
+      (file) => !isAllowedUploadMimeType(file.mimetype),
+    );
     if (invalidMimeFile) {
       res
         .status(400)
-        .json({ error: `File type not allowed: ${invalidMimeFile.mimetype || 'unknown'}` });
+        .json({
+          error: `File type not allowed: ${invalidMimeFile.mimetype || "unknown"}`,
+        });
       return;
     }
 
-    const oversizedFile = files.find((file) => file.size > max_upload_file_size_bytes);
+    const oversizedFile = files.find(
+      (file) => file.size > max_upload_file_size_bytes,
+    );
     if (oversizedFile) {
       res
         .status(400)
-        .json({ error: `File too large (max ${Math.floor(max_upload_file_size_bytes / (1024 * 1024))} MB)` });
+        .json({
+          error: `File too large (max ${Math.floor(max_upload_file_size_bytes / (1024 * 1024))} MB)`,
+        });
       return;
     }
 
@@ -180,7 +213,9 @@ export async function upload(req: Request, res: Response): Promise<void> {
       const mimeType = file.mimetype || "application/octet-stream";
       const buffer = file.buffer;
       if (!buffer) {
-        logger.warn("Upload file missing buffer", { originalname: file.originalname });
+        logger.warn("Upload file missing buffer", {
+          originalname: file.originalname,
+        });
         continue;
       }
 
@@ -220,8 +255,8 @@ export async function upload(req: Request, res: Response): Promise<void> {
             size: record.size,
             mimeType: record.mimeType,
           },
-        })
-      )
+        }),
+      ),
     );
 
     res.status(201).json({ files: created });
@@ -230,7 +265,6 @@ export async function upload(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: "Internal server error" });
   }
 }
-
 
 export async function download(req: Request, res: Response): Promise<void> {
   try {
@@ -264,7 +298,7 @@ export async function download(req: Request, res: Response): Promise<void> {
     res.setHeader("Content-Type", fileRecord.mimeType);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${safeName.replace(/"/g, '\\"')}"`
+      `attachment; filename="${safeName.replace(/"/g, '\\"')}"`,
     );
 
     await createAuditLog({
@@ -308,7 +342,8 @@ export async function download(req: Request, res: Response): Promise<void> {
       const readStream = storageFile.createReadStream();
       readStream.on("error", (err) => {
         logger.error("File stream error", err);
-        if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+        if (!res.headersSent)
+          res.status(500).json({ error: "Internal server error" });
         else res.end();
       });
       readStream.pipe(res);
@@ -331,13 +366,18 @@ function getPreviewCacheKey(fileId: string): string {
   return `preview:file:${fileId}:v1`;
 }
 
-function setPreviewHeaders(res: Response, fileName: string, mimeType: string, size: number): void {
+function setPreviewHeaders(
+  res: Response,
+  fileName: string,
+  mimeType: string,
+  size: number,
+): void {
   const safeName = fileName.replace(/[^\x20-\x7E]/g, "_");
   res.setHeader("Content-Type", mimeType || "application/octet-stream");
   res.setHeader("Content-Length", String(size));
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${safeName.replace(/"/g, '\\"')}"`
+    `inline; filename="${safeName.replace(/"/g, '\\"')}"`,
   );
   res.setHeader("Cache-Control", "private, max-age=300");
 }
@@ -438,7 +478,8 @@ export async function preview(req: Request, res: Response): Promise<void> {
     const readStream = storageFile.createReadStream();
     readStream.on("error", (err) => {
       logger.error("File preview stream error", err);
-      if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+      if (!res.headersSent)
+        res.status(500).json({ error: "Internal server error" });
       else res.end();
     });
     readStream.pipe(res);
@@ -536,7 +577,8 @@ export async function update(req: Request, res: Response): Promise<void> {
     }
 
     if (folderId !== undefined) {
-      const nextFolderId = folderId === "" || folderId === null ? null : folderId;
+      const nextFolderId =
+        folderId === "" || folderId === null ? null : folderId;
 
       if (nextFolderId !== null) {
         const folder = await prisma.folder.findFirst({
@@ -614,7 +656,9 @@ export async function remove(req: Request, res: Response): Promise<void> {
     }
 
     const bucket = getFirebaseBucket();
-    const storagePath = isStoragePath(file.path) ? file.path : getLegacyStoragePath(file.path);
+    const storagePath = isStoragePath(file.path)
+      ? file.path
+      : getLegacyStoragePath(file.path);
     if (bucket && storagePath) {
       try {
         await bucket.file(storagePath).delete();

@@ -24,17 +24,25 @@ function normalizeOptionalFamilyId(value: unknown): unknown {
 
 const optionalFolderIdSchema = z.preprocess(
   normalizeOptionalFolderId,
-  z.string().min(1).nullable().optional()
+  z.string().min(1).nullable().optional(),
 );
 
 const optionalFamilyIdSchema = z.preprocess(
   normalizeOptionalFamilyId,
-  z.string().min(1).nullable().optional()
+  z.string().min(1).nullable().optional(),
 );
 
 export const folderListQuerySchema = z.object({
   parentId: optionalFolderIdSchema,
   familyId: optionalFamilyIdSchema,
+  limit: z.preprocess(
+    (v) => (v === undefined ? undefined : Number(Array.isArray(v) ? v[0] : v)),
+    z.number().int().min(1).max(200).optional().default(50),
+  ),
+  page: z.preprocess(
+    (v) => (v === undefined ? undefined : Number(Array.isArray(v) ? v[0] : v)),
+    z.number().int().min(1).optional().default(1),
+  ),
 });
 
 export const folderScopeQuerySchema = z.object({
@@ -56,7 +64,6 @@ export const updateFolderSchema = z
     name: z.string().trim().min(1, "Name cannot be empty").optional(),
     parentId: optionalFolderIdSchema,
   })
-  .refine(
-    (data) => data.name !== undefined || data.parentId !== undefined,
-    { message: "No fields to update" }
-  );
+  .refine((data) => data.name !== undefined || data.parentId !== undefined, {
+    message: "No fields to update",
+  });

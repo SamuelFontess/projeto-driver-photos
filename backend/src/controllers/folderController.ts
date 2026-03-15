@@ -28,7 +28,15 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     const parentId = req.query.parentId as string | undefined;
     const familyId = resolveFamilyId(req);
-    const isRoot = parentId === undefined || parentId === "" || parentId === "null";
+    const isRoot =
+      parentId === undefined || parentId === "" || parentId === "null";
+
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit as string) || 50, 1),
+      200,
+    );
+    const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+    const skip = (page - 1) * limit;
 
     if (familyId) {
       const familyAccess = await requireFamilyAccess(userId, familyId);
@@ -38,14 +46,18 @@ export async function list(req: Request, res: Response): Promise<void> {
       }
     }
 
-    const [folders, favoriteRows] = await Promise.all([
+    const whereClause = {
+      ...(familyId ? {} : { userId }),
+      familyId: familyId ?? null,
+      parentId: isRoot ? null : parentId,
+    };
+
+    const [folders, total, favoriteRows] = await prisma.$transaction([
       prisma.folder.findMany({
-        where: {
-          ...(familyId ? {} : { userId }),
-          familyId: familyId ?? null,
-          parentId: isRoot ? null : parentId,
-        },
+        where: whereClause,
         orderBy: { name: "asc" },
+        take: limit,
+        skip,
         select: {
           id: true,
           name: true,
@@ -54,6 +66,7 @@ export async function list(req: Request, res: Response): Promise<void> {
           updatedAt: true,
         },
       }),
+      prisma.folder.count({ where: whereClause }),
       prisma.favoriteFolder.findMany({
         where: { userId },
         select: { folderId: true },
@@ -88,10 +101,16 @@ export async function list(req: Request, res: Response): Promise<void> {
           filesCount,
           isFavorited: favoriteIds.has(folder.id),
         };
-      })
+      }),
     );
 
-    res.json({ folders: foldersWithCounts });
+    res.json({
+      folders: foldersWithCounts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     logger.error("Folder list error", error);
     res.status(500).json({ error: "Internal server error" });
@@ -107,7 +126,10 @@ export async function create(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { name, parentId } = req.body as { name?: string; parentId?: string | null };
+    const { name, parentId } = req.body as {
+      name?: string;
+      parentId?: string | null;
+    };
     const familyId = resolveFamilyId(req);
 
     if (familyId) {
@@ -131,7 +153,9 @@ export async function create(req: Request, res: Response): Promise<void> {
 
     if (parentId != null && parentId !== "") {
       const parent = await prisma.folder.findFirst({
-        where: familyId ? { id: parentId, familyId } : { id: parentId, userId, familyId: null },
+        where: familyId
+          ? { id: parentId, familyId }
+          : { id: parentId, userId, familyId: null },
       });
       if (!parent) {
         res.status(404).json({ error: "Parent folder not found" });
@@ -318,7 +342,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
 async function isDescendant(
   folderId: string,
   ancestorId: string,
-  scope: { userId: string; familyId: string | null }
+  scope: { userId: string; familyId: string | null },
 ): Promise<boolean> {
   let currentId: string | null = folderId;
   const visited = new Set<string>();
@@ -349,7 +373,10 @@ async function isDescendant(
 
     if (scope.familyId) {
       if (folderResult.familyId !== scope.familyId) break;
-    } else if (folderResult.userId !== scope.userId || folderResult.familyId !== null) {
+    } else if (
+      folderResult.userId !== scope.userId ||
+      folderResult.familyId !== null
+    ) {
       break;
     }
 
@@ -415,7 +442,8 @@ export async function update(req: Request, res: Response): Promise<void> {
     // Valida e atualiza parentId se fornecido
     if (parentId !== undefined) {
       // Se parentId é null ou string vazia, move para raiz
-      const newParentId = parentId === "" || parentId === null ? null : parentId;
+      const newParentId =
+        parentId === "" || parentId === null ? null : parentId;
 
       // Não pode mover para dentro de si mesma
       if (newParentId === id) {
