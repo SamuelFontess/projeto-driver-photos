@@ -1,7 +1,7 @@
-import request from 'supertest';
-import type { Express } from 'express';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateToken } from './utils/jwt';
+import request from "supertest";
+import type { Express } from "express";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { generateToken } from "./utils/jwt";
 
 const prismaMock = {
   user: {
@@ -16,20 +16,29 @@ const prismaMock = {
     findMany: vi.fn(),
     count: vi.fn(),
   },
+  favoriteFolder: {
+    findMany: vi.fn(),
+  },
   auditLog: {
     create: vi.fn().mockResolvedValue(undefined),
   },
+  $transaction: vi.fn((queries: unknown) => {
+    if (Array.isArray(queries)) {
+      return Promise.all(queries);
+    }
+    return Promise.resolve([]);
+  }),
 };
 
-vi.mock('./lib/prisma', () => ({
+vi.mock("./lib/prisma", () => ({
   prisma: prismaMock,
 }));
 
 let app: Express;
 
-describe('Routes integration', () => {
+describe("Routes integration", () => {
   beforeAll(async () => {
-    const appModule = await import('./app');
+    const appModule = await import("./app");
     app = appModule.app;
   });
 
@@ -39,68 +48,84 @@ describe('Routes integration', () => {
     prismaMock.file.count.mockResolvedValue(0);
     prismaMock.folder.findMany.mockResolvedValue([]);
     prismaMock.file.findMany.mockResolvedValue([]);
+    prismaMock.favoriteFolder.findMany.mockResolvedValue([]);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
+    prismaMock.$transaction.mockImplementation((queries: unknown) => {
+      if (Array.isArray(queries)) {
+        return Promise.all(queries);
+      }
+      return Promise.resolve([]);
+    });
   });
 
-  it('POST /api/auth/register returns 201 on success', async () => {
+  it("POST /api/auth/register returns 201 on success", async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue({
-      id: 'user-1',
-      email: 'new-user@mail.com',
-      name: 'New User',
+      id: "user-1",
+      email: "new-user@mail.com",
+      name: "New User",
       createdAt: new Date(),
     });
 
-    const response = await request(app).post('/api/auth/register').send({
-      email: 'new-user@mail.com',
-      password: '123456',
-      name: 'New User',
+    const response = await request(app).post("/api/auth/register").send({
+      email: "new-user@mail.com",
+      password: "123456",
+      name: "New User",
     });
 
     expect(response.status).toBe(201);
-    expect(response.body).toHaveProperty('token');
+    expect(response.body).toHaveProperty("token");
     expect(prismaMock.user.create).toHaveBeenCalled();
   });
 
-  it('GET /api/folders returns folders for authenticated user', async () => {
-    const token = generateToken({ userId: 'user-1', email: 'user@mail.com' });
+  it("GET /api/folders returns folders for authenticated user", async () => {
+    const token = generateToken({ userId: "user-1", email: "user@mail.com" });
     prismaMock.folder.findMany.mockResolvedValue([
       {
-        id: 'folder-1',
-        name: 'Root Folder',
+        id: "folder-1",
+        name: "Root Folder",
         parentId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
     ]);
+    prismaMock.folder.count.mockResolvedValue(1);
+    prismaMock.favoriteFolder.findMany.mockResolvedValue([]);
 
     const response = await request(app)
-      .get('/api/folders')
-      .set('Authorization', `Bearer ${token}`);
+      .get("/api/folders")
+      .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
     expect(response.body.folders).toHaveLength(1);
-    expect(prismaMock.folder.findMany).toHaveBeenCalled();
+    expect(response.body.total).toBe(1);
+    expect(response.body.page).toBe(1);
+    expect(response.body.totalPages).toBe(1);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 
-  it('GET /api/files?search= uses global search filter', async () => {
-    const token = generateToken({ userId: 'user-1', email: 'user@mail.com' });
+  it("GET /api/files?search= uses global search filter", async () => {
+    const token = generateToken({ userId: "user-1", email: "user@mail.com" });
 
     const response = await request(app)
-      .get('/api/files?search=report')
-      .set('Authorization', `Bearer ${token}`);
+      .get("/api/files?search=report")
+      .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
+    expect(response.body.total).toBeDefined();
+    expect(response.body.page).toBe(1);
+    expect(response.body.totalPages).toBeDefined();
+    expect(prismaMock.$transaction).toHaveBeenCalled();
     expect(prismaMock.file.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          userId: 'user-1',
+          userId: "user-1",
           name: {
-            contains: 'report',
-            mode: 'insensitive',
+            contains: "report",
+            mode: "insensitive",
           },
         }),
-      })
+      }),
     );
   });
 });
