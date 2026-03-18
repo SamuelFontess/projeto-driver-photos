@@ -7,6 +7,7 @@ import { generateToken } from '../utils/jwt';
 import { createAuditLog } from '../lib/auditLog';
 import { initFirebase } from '../lib/firebase';
 import { publishEmailJob } from '../lib/emailQueue';
+import { isAdminEmail } from '../lib/adminEmails';
 import * as admin from 'firebase-admin';
 
 const FORGOT_PASSWORD_SUCCESS_MESSAGE = 'If this email exists, password reset instructions were queued';
@@ -396,11 +397,7 @@ export async function me(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const adminEmails = (process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    const isAdmin = adminEmails.includes(user.email.toLowerCase());
+    const isAdmin = isAdminEmail(user.email);
 
     res.json({ user: { ...user, isAdmin } });
   } catch (error) {
