@@ -22,6 +22,24 @@ export const authRateLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again later.' },
 });
 
+// Rate limit dedicado para refresh de token — limita abuso de refresh token roubado
+export const refreshRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+
+// Rate limit para operações admin — previne email spam por conta comprometida ou loop
+export const adminRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+
 export const fileUploadRateLimiter = rateLimit({
   windowMs: uploadWindowMs,
   max: uploadMaxRequests,

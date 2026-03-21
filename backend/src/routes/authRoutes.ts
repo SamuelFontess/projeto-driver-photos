@@ -20,23 +20,21 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
 } from '../validation/authSchemas';
-import { authRateLimiter } from '../middleware/rateLimit';
+import { authRateLimiter, refreshRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
-router.use(authRateLimiter);
+// Rotas públicas — rate limit aplicado só onde faz sentido
+router.post('/register', authRateLimiter, validate(registerSchema), register);
+router.post('/login', authRateLimiter, validate(loginSchema), login);
+router.post('/google', authRateLimiter, validate(googleAuthSchema), googleAuth);
+router.post('/forgot-password', authRateLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post('/reset-password', authRateLimiter, validate(resetPasswordSchema), resetPassword);
 
-// Rotas públicas
-router.post('/register', validate(registerSchema), register);
-router.post('/login', validate(loginSchema), login);
-router.post('/google', validate(googleAuthSchema), googleAuth);
-router.post('/forgot-password', validate(forgotPasswordSchema), forgotPassword);
-router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
-
-// Rotas protegidas (requerem autenticação)
+// Rotas protegidas — sem rate limit (/me, /logout protegidos pelo authenticate)
 router.get('/me', authenticate, me);
 router.patch('/me', authenticate, validate(updateProfileSchema), updateProfile);
 router.post('/logout', authenticate, logout);
-router.post('/refresh', refresh);
+router.post('/refresh', refreshRateLimiter, refresh);
 
 export default router;
