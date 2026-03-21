@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { hashPassword, comparePassword } from '../utils/password';
-import { generateToken } from '../utils/jwt';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { createAuditLog } from '../lib/auditLog';
 import { initFirebase } from '../lib/firebase';
 import { publishEmailJob } from '../lib/emailQueue';
@@ -11,6 +11,34 @@ import { isAdminEmail } from '../lib/adminEmails';
 import * as admin from 'firebase-admin';
 
 const FORGOT_PASSWORD_SUCCESS_MESSAGE = 'If this email exists, password reset instructions were queued';
+
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+function setAuthCookies(res: Response, payload: { userId: string; email: string }): void {
+  const accessToken = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  res.cookie('access_token', accessToken, {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: 'strict',
+    maxAge: 15 * 60 * 1000, // 15 minutos
+    path: '/',
+  });
+
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: 'strict',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
+    path: '/api/auth/refresh',
+  });
+}
+
+function clearAuthCookies(res: Response): void {
+  res.clearCookie('access_token', { httpOnly: true, secure: IS_PROD, sameSite: 'strict', path: '/' });
+  res.clearCookie('refresh_token', { httpOnly: true, secure: IS_PROD, sameSite: 'strict', path: '/api/auth/refresh' });
+}
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -68,12 +96,6 @@ export async function register(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // Gerar token JWT
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-    });
-
     await createAuditLog({
       req,
       action: 'auth.register',
@@ -83,13 +105,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       metadata: { email: user.email },
     });
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    setAuthCookies(res, { userId: user.id, email: user.email });
 
     res.status(201).json({
       message: 'User created successfully',
@@ -132,12 +148,6 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Gerar token JWT
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-    });
-
     await createAuditLog({
       req,
       action: 'auth.login',
@@ -147,13 +157,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       metadata: { email: user.email },
     });
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    setAuthCookies(res, { userId: user.id, email: user.email });
 
     res.json({
       message: 'Login successful',
@@ -225,11 +229,6 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
       });
     }
 
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-    });
-
     await createAuditLog({
       req,
       action: 'auth.google',
@@ -239,13 +238,7 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
       metadata: { email: user.email },
     });
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    setAuthCookies(res, { userId: user.id, email: user.email });
 
     res.json({
       message: 'Login successful',
@@ -428,13 +421,34 @@ export async function me(req: Request, res: Response): Promise<void> {
 }
 
 export function logout(req: Request, res: Response): void {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-  });
+  clearAuthCookies(res);
   res.json({ message: 'Logged out' });
+}
+
+export function refresh(req: Request, res: Response): void {
+  try {
+    const token = req.cookies?.refresh_token as string | undefined;
+
+    if (!token) {
+      res.status(401).json({ error: 'Refresh token missing' });
+      return;
+    }
+
+    const payload = verifyRefreshToken(token);
+    const newAccessToken = generateAccessToken({ userId: payload.userId, email: payload.email });
+
+    res.cookie('access_token', newAccessToken, {
+      httpOnly: true,
+      secure: IS_PROD,
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000,
+      path: '/',
+    });
+
+    res.json({ message: 'Token refreshed' });
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired refresh token' });
+  }
 }
 
 export async function updateProfile(req: Request, res: Response): Promise<void> {
