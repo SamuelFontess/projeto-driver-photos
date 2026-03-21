@@ -47,6 +47,7 @@ const api = {
   resetPassword: auth.resetPassword,
   getMe: auth.getMe,
   updateProfile: auth.updateProfile,
+  logoutRequest: auth.logoutRequest,
   getFolders: folders.getFolders,
   createFolder: folders.createFolder,
   updateFolder: folders.updateFolder,

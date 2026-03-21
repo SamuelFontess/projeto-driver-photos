@@ -29,7 +29,6 @@ export interface AuthResponse {
     email: string;
     name?: string;
   };
-  token: string;
 }
 
 export interface User {
@@ -78,6 +77,10 @@ export async function resetPassword(data: ResetPasswordData): Promise<{ message:
 
 export async function getMe(): Promise<{ user: User }> {
   return request<{ user: User }>('/api/auth/me', { method: 'GET' });
+}
+
+export async function logoutRequest(): Promise<void> {
+  return request<void>('/api/auth/logout', { method: 'POST' });
 }
 
 export interface UpdateProfilePayload {

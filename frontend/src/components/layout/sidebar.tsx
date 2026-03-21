@@ -34,8 +34,8 @@ export function Sidebar() {
     closeMobile();
   }, [pathname, closeMobile]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
   };
 

@@ -1,4 +1,4 @@
-/** Cliente HTTP: base URL, token e tratamento de erros. Para FormData não setamos Content-Type. */
+/** Cliente HTTP: base URL e tratamento de erros. Autenticação via cookie HTTP-only. */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
@@ -10,11 +10,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
   }
-}
-
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
 }
 
 export function getBaseUrl(): string {
@@ -36,7 +31,6 @@ export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
@@ -45,16 +39,13 @@ export async function request<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   let attempt = 0;
   let response: Response | null = null;
   while (attempt < 2) {
     response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include',
     });
     if (response.ok || !RETRYABLE_STATUS.has(response.status)) {
       break;
@@ -80,13 +71,10 @@ export async function request<T>(
 export async function requestBlob(
   endpoint: string
 ): Promise<{ blob: Blob; filename?: string }> {
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_URL}${endpoint}`, { method: 'GET', headers });
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
 
   if (!response.ok) {
     const message = await parseError(response);
