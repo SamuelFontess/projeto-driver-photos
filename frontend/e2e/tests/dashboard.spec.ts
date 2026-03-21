@@ -63,10 +63,6 @@ test.describe("Sidebar", () => {
     await dashboard.logout();
 
     await expect(page).toHaveURL(/\/login/, { timeout: 8000 });
-
-    // Token deve ter sido removido
-    const token = await page.evaluate(() => localStorage.getItem("token"));
-    expect(token).toBeNull();
   });
 });
 
@@ -292,7 +288,7 @@ test.describe("Página de Perfil", () => {
 
     await page.getByRole("button", { name: "Salvar alterações" }).click();
 
-    await expect(page.getByText("Perfil atualizado")).toBeVisible({
+    await expect(page.getByText("Perfil atualizado", { exact: true })).toBeVisible({
       timeout: 8000,
     });
   });

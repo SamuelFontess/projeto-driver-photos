@@ -9,14 +9,9 @@ const MOCK_USER = {
 
 const MOCK_TOKEN = "mock-jwt-token-for-e2e-tests";
 
-/** Injeta token no localStorage e mocka todos os endpoints necessários para o dashboard funcionar. */
+/** Mocka todos os endpoints necessários para o dashboard funcionar. */
 export async function setupAuthenticatedState(page: Page) {
-  // 1. Token no localStorage antes do bootstrap do AuthContext
-  await page.addInitScript((token) => {
-    localStorage.setItem("token", token);
-  }, MOCK_TOKEN);
-
-  // 2. Mock GET /api/auth/me → usuário autenticado
+  // Mock GET /api/auth/me → usuário autenticado
   await page.route("**/api/auth/me", (route) => {
     if (route.request().method() === "GET") {
       route.fulfill({
@@ -29,7 +24,7 @@ export async function setupAuthenticatedState(page: Page) {
     }
   });
 
-  // 3. Mock GET /api/folders → lista vazia
+  // Mock GET /api/folders → lista vazia
   await page.route("**/api/folders**", (route) => {
     route.fulfill({
       status: 200,
@@ -44,7 +39,7 @@ export async function setupAuthenticatedState(page: Page) {
     });
   });
 
-  // 4. Mock GET /api/files → lista vazia
+  // Mock GET /api/files → lista vazia
   await page.route("**/api/files**", (route) => {
     route.fulfill({
       status: 200,
@@ -63,6 +58,14 @@ export async function setupAuthenticatedState(page: Page) {
 /** Garante que o endpoint getMe retorna 401 (usuário não autenticado). */
 export async function setupUnauthenticatedState(page: Page) {
   await page.route("**/api/auth/me", (route) => {
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Unauthorized" }),
+    });
+  });
+  // Refresh também deve retornar 401 para não ficar aguardando timeout de rede
+  await page.route("**/api/auth/refresh", (route) => {
     route.fulfill({
       status: 401,
       contentType: "application/json",

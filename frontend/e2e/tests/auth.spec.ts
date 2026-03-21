@@ -40,9 +40,6 @@ test.describe("Login", () => {
         body: JSON.stringify({ token: MOCK_TOKEN, user: MOCK_USER }),
       });
     });
-    await page.route("**/api/auth/me", (route) =>
-      route.fulfill({ status: 200, body: JSON.stringify({ user: MOCK_USER }) }),
-    );
 
     await loginPage.emailInput.fill("test@driver.com");
     await loginPage.passwordInput.fill("senha123");
@@ -88,9 +85,6 @@ test.describe("Login", () => {
           message: "ok",
         }),
       }),
-    );
-    await page.route("**/api/auth/me", (route) =>
-      route.fulfill({ status: 200, body: JSON.stringify({ user: MOCK_USER }) }),
     );
     await page.route("**/api/folders**", (route) =>
       route.fulfill({
@@ -178,9 +172,6 @@ test.describe("Registro", () => {
           message: "ok",
         }),
       }),
-    );
-    await page.route("**/api/auth/me", (route) =>
-      route.fulfill({ status: 200, body: JSON.stringify({ user: MOCK_USER }) }),
     );
     await page.route("**/api/folders**", (route) =>
       route.fulfill({
