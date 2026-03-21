@@ -74,7 +74,8 @@ describe("Routes integration", () => {
     });
 
     expect(response.status).toBe(201);
-    expect(response.body).toHaveProperty("token");
+    expect(response.body).toHaveProperty("user");
+    expect(response.headers["set-cookie"]).toBeDefined();
     expect(prismaMock.user.create).toHaveBeenCalled();
   });
 
@@ -94,7 +95,7 @@ describe("Routes integration", () => {
 
     const response = await request(app)
       .get("/api/folders")
-      .set("Authorization", `Bearer ${token}`);
+      .set("Cookie", `access_token=${token}`);
 
     expect(response.status).toBe(200);
     expect(response.body.folders).toHaveLength(1);
@@ -109,7 +110,7 @@ describe("Routes integration", () => {
 
     const response = await request(app)
       .get("/api/files?search=report")
-      .set("Authorization", `Bearer ${token}`);
+      .set("Cookie", `access_token=${token}`);
 
     expect(response.status).toBe(200);
     expect(response.body.total).toBeDefined();
