@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { apiReference } from '@scalar/express-api-reference';
 import authRoutes from './routes/authRoutes';
 import folderRoutes from './routes/folderRoutes';
@@ -20,6 +21,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 
 app.get('/health', (req, res) => {

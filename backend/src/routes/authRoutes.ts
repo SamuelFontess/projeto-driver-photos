@@ -7,6 +7,7 @@ import {
   resetPassword,
   me,
   updateProfile,
+  logout,
 } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -34,5 +35,6 @@ router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
 // Rotas protegidas (requerem autenticação)
 router.get('/me', authenticate, me);
 router.patch('/me', authenticate, validate(updateProfileSchema), updateProfile);
+router.post('/logout', authenticate, logout);
 
 export default router;

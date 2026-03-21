@@ -16,17 +16,10 @@ export function authenticate(
   next: NextFunction
 ): void {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      res.status(401).json({ error: 'Authorization header missing' });
-      return;
-    }
-
-    const token = authHeader.split(' ')[1]; // Bearer <token>
+    const token = req.cookies?.token as string | undefined;
 
     if (!token) {
-      res.status(401).json({ error: 'Token missing' });
+      res.status(401).json({ error: 'Not authenticated' });
       return;
     }
 

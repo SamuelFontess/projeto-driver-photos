@@ -83,10 +83,17 @@ export async function register(req: Request, res: Response): Promise<void> {
       metadata: { email: user.email },
     });
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
     res.status(201).json({
       message: 'User created successfully',
       user,
-      token,
     });
   } catch (error) {
     logger.error('Register error', error);
@@ -140,6 +147,14 @@ export async function login(req: Request, res: Response): Promise<void> {
       metadata: { email: user.email },
     });
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
     res.json({
       message: 'Login successful',
       user: {
@@ -147,7 +162,6 @@ export async function login(req: Request, res: Response): Promise<void> {
         email: user.email,
         name: user.name,
       },
-      token,
     });
   } catch (error) {
     logger.error('Login error', error);
@@ -225,10 +239,17 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
       metadata: { email: user.email },
     });
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
     res.json({
       message: 'Login successful',
       user: { id: user.id, email: user.email, name: user.name },
-      token,
     });
   } catch (error) {
     logger.error('Google auth error', error);
@@ -404,6 +425,16 @@ export async function me(req: Request, res: Response): Promise<void> {
     logger.error('Me error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+export function logout(req: Request, res: Response): void {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+  res.json({ message: 'Logged out' });
 }
 
 export async function updateProfile(req: Request, res: Response): Promise<void> {
