@@ -1,9 +1,8 @@
 import { Request } from 'express';
 import { prisma } from './prisma';
 import { logger } from './logger';
-import { Prisma } from '@prisma/client';
-
-type AuditMetadata = Prisma.InputJsonValue;
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+type AuditMetadata = JsonValue;
 
 interface CreateAuditLogParams {
   req: Request;
