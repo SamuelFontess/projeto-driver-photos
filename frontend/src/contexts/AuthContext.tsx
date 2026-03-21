@@ -26,6 +26,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     markUx('auth-bootstrap-start');
     fetchUser();
+
+    const handleSessionExpired = () => setUser(null);
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
   }, []);
 
   const fetchUser = async () => {

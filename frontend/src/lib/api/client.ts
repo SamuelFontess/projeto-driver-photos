@@ -1,8 +1,18 @@
 /** Cliente HTTP: base URL e tratamento de erros. Autenticação via cookie HTTP-only. */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const RETRYABLE_STATUS = new Set([408, 500, 502, 503, 504]);
 const REFRESH_ENDPOINT = '/api/auth/refresh';
+
+// Endpoints públicos que podem retornar 401 legitimamente (credencial inválida)
+// e NÃO devem disparar o fluxo de session refresh
+const PUBLIC_AUTH_ENDPOINTS = new Set([
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/google',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+]);
 
 export class ApiError extends Error {
   status: number;
@@ -35,9 +45,9 @@ async function tryRefresh(): Promise<boolean> {
   }
 }
 
-function redirectToLogin(): void {
+function notifySessionExpired(): void {
   if (typeof window !== 'undefined') {
-    window.location.href = '/login';
+    window.dispatchEvent(new Event('auth:session-expired'));
   }
 }
 
@@ -76,7 +86,7 @@ export async function request<T>(
   if (!response || !response.ok) {
     const status = response?.status ?? 500;
 
-    if (status === 401 && endpoint !== REFRESH_ENDPOINT) {
+    if (status === 401 && endpoint !== REFRESH_ENDPOINT && !PUBLIC_AUTH_ENDPOINTS.has(endpoint)) {
       const refreshed = await tryRefresh();
       if (refreshed) {
         const retryResponse = await fetch(`${API_URL}${endpoint}`, {
@@ -90,7 +100,7 @@ export async function request<T>(
         }
         throw new ApiError(await parseError(retryResponse), retryResponse.status);
       }
-      redirectToLogin();
+      notifySessionExpired();
       throw new ApiError('Session expired', 401);
     }
 
