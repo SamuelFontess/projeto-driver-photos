@@ -2,6 +2,7 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const REFRESH_ENDPOINT = '/api/auth/refresh';
 
 export class ApiError extends Error {
   status: number;
@@ -20,6 +21,24 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => {
     globalThis.setTimeout(resolve, ms);
   });
+}
+
+async function tryRefresh(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}${REFRESH_ENDPOINT}`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function redirectToLogin(): void {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -56,6 +75,25 @@ export async function request<T>(
 
   if (!response || !response.ok) {
     const status = response?.status ?? 500;
+
+    if (status === 401 && endpoint !== REFRESH_ENDPOINT) {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        const retryResponse = await fetch(`${API_URL}${endpoint}`, {
+          ...options,
+          headers,
+          credentials: 'include',
+        });
+        if (retryResponse.ok) {
+          if (retryResponse.status === 204) return undefined as T;
+          return retryResponse.json() as Promise<T>;
+        }
+        throw new ApiError(await parseError(retryResponse), retryResponse.status);
+      }
+      redirectToLogin();
+      throw new ApiError('Session expired', 401);
+    }
+
     const message = response ? await parseError(response) : 'Unexpected API error';
     throw new ApiError(message, status);
   }
