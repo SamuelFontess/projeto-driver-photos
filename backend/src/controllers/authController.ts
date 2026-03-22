@@ -13,6 +13,9 @@ import * as admin from 'firebase-admin';
 const FORGOT_PASSWORD_SUCCESS_MESSAGE = 'If this email exists, password reset instructions were queued';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
+const COOKIE_SECURE = process.env.COOKIE_SECURE !== undefined
+  ? process.env.COOKIE_SECURE === 'true'
+  : IS_PROD;
 
 function setAuthCookies(res: Response, payload: { userId: string; email: string }): void {
   const accessToken = generateAccessToken(payload);
@@ -20,7 +23,7 @@ function setAuthCookies(res: Response, payload: { userId: string; email: string 
 
   res.cookie('access_token', accessToken, {
     httpOnly: true,
-    secure: IS_PROD,
+    secure: COOKIE_SECURE,
     sameSite: 'strict',
     maxAge: 15 * 60 * 1000, // 15 minutos
     path: '/',
@@ -28,7 +31,7 @@ function setAuthCookies(res: Response, payload: { userId: string; email: string 
 
   res.cookie('refresh_token', refreshToken, {
     httpOnly: true,
-    secure: IS_PROD,
+    secure: COOKIE_SECURE,
     sameSite: 'strict',
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dias
     path: '/api/auth/refresh',
@@ -36,8 +39,8 @@ function setAuthCookies(res: Response, payload: { userId: string; email: string 
 }
 
 function clearAuthCookies(res: Response): void {
-  res.clearCookie('access_token', { httpOnly: true, secure: IS_PROD, sameSite: 'strict', path: '/' });
-  res.clearCookie('refresh_token', { httpOnly: true, secure: IS_PROD, sameSite: 'strict', path: '/api/auth/refresh' });
+  res.clearCookie('access_token', { httpOnly: true, secure: COOKIE_SECURE, sameSite: 'strict', path: '/' });
+  res.clearCookie('refresh_token', { httpOnly: true, secure: COOKIE_SECURE, sameSite: 'strict', path: '/api/auth/refresh' });
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -439,7 +442,7 @@ export function refresh(req: Request, res: Response): void {
 
     res.cookie('access_token', newAccessToken, {
       httpOnly: true,
-      secure: IS_PROD,
+      secure: COOKIE_SECURE,
       sameSite: 'strict',
       maxAge: 15 * 60 * 1000,
       path: '/',

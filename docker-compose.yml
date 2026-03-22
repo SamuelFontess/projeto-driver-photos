@@ -84,6 +84,7 @@ services:
       FILE_PREVIEW_MAX_BYTES: ${FILE_PREVIEW_MAX_BYTES:-52428800}
       DOCS_USER: ${DOCS_USER:-admin}
       DOCS_PASSWORD: ${DOCS_PASSWORD}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
     volumes:
       - uploads_data:/app/uploads
       - ./backend/serviceAccountKey.json:/app/serviceAccountKey.json:ro
