@@ -134,6 +134,19 @@ services:
     depends_on:
       - backend
 
+  # ─── Portainer ──────────────────────────────────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+    networks:
+      - driver_net
+
   # ─── Watchtower ─────────────────────────────────────────────────────────────
   watchtower:
     image: containrrr/watchtower
@@ -157,3 +170,4 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  portainer_data:
