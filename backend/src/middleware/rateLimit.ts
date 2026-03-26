@@ -1,18 +1,11 @@
 import { rateLimit } from 'express-rate-limit';
+import { parsePositiveInt } from '../utils/parsePositiveInt';
 
-function readPositiveIntFromEnv(key: string, fallback: number): number {
-  const value = Number(process.env[key]);
-  if (!Number.isFinite(value) || value <= 0) {
-    return fallback;
-  }
-  return Math.floor(value);
-}
+const authWindowMs = parsePositiveInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
+const authMaxRequests = parsePositiveInt(process.env.AUTH_RATE_LIMIT_MAX, 20);
 
-const authWindowMs = readPositiveIntFromEnv('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000);
-const authMaxRequests = readPositiveIntFromEnv('AUTH_RATE_LIMIT_MAX', 20);
-
-const uploadWindowMs = readPositiveIntFromEnv('UPLOAD_RATE_LIMIT_WINDOW_MS', 60 * 1000);
-const uploadMaxRequests = readPositiveIntFromEnv('UPLOAD_RATE_LIMIT_MAX', 15);
+const uploadWindowMs = parsePositiveInt(process.env.UPLOAD_RATE_LIMIT_WINDOW_MS, 60 * 1000);
+const uploadMaxRequests = parsePositiveInt(process.env.UPLOAD_RATE_LIMIT_MAX, 15);
 
 export const authRateLimiter = rateLimit({
   windowMs: authWindowMs,
@@ -46,4 +39,15 @@ export const fileUploadRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many upload requests. Please try again later.' },
+});
+
+// Dedicated rate limit for forgot-password to prevent email bombing
+const forgotPasswordMaxRequests = parsePositiveInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX, 5);
+
+export const forgotPasswordRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: forgotPasswordMaxRequests,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests. Please try again later.' },
 });

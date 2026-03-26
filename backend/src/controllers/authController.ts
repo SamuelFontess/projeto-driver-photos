@@ -8,6 +8,7 @@ import { createAuditLog } from '../lib/auditLog';
 import { initFirebase } from '../lib/firebase';
 import { publishEmailJob } from '../lib/emailQueue';
 import { isAdminEmail } from '../lib/adminEmails';
+import { parsePositiveInt } from '../utils/parsePositiveInt';
 import * as admin from 'firebase-admin';
 
 const FORGOT_PASSWORD_SUCCESS_MESSAGE = 'If this email exists, password reset instructions were queued';
@@ -41,14 +42,6 @@ function setAuthCookies(res: Response, payload: { userId: string; email: string 
 function clearAuthCookies(res: Response): void {
   res.clearCookie('access_token', { httpOnly: true, secure: COOKIE_SECURE, sameSite: 'strict', path: '/' });
   res.clearCookie('refresh_token', { httpOnly: true, secure: COOKIE_SECURE, sameSite: 'strict', path: '/api/auth/refresh' });
-}
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(value ?? '', 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
 }
 
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = parsePositiveInt(
