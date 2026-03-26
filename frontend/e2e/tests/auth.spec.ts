@@ -72,10 +72,8 @@ test.describe("Login", () => {
   test("redireciona para /dashboard após login bem-sucedido", async ({
     page,
   }) => {
-    // Registra rotas ANTES do goto para evitar race condition com React Strict Mode
-    // (double-invoke de effects em dev): se auth/me → 200 fosse registrado após goto,
-    // o segundo efeito poderia buscar o usuário e PublicOnlyRoute redirecionaria antes
-    // de fillAndSubmit rodar.
+    // Rotas antes do goto: React Strict Mode invoca effects duas vezes em dev;
+    // auth/me → 200 registrado após goto causaria redirecionamento antes do fill.
     let loginDone = false;
 
     await page.route("**/api/auth/me", (route) =>
@@ -86,8 +84,8 @@ test.describe("Login", () => {
       }),
     );
     await page.route("**/api/auth/login", async (route) => {
-      // addCookies() em vez de Set-Cookie header: Set-Cookie via route.fulfill() seta o
-      // cookie no domínio da API (localhost:8080), não no domínio do Next.js (localhost:3005).
+      // addCookies em vez de Set-Cookie: Set-Cookie via route.fulfill() aplica o cookie
+      // no domínio da API (localhost:8080), não no Next.js (localhost:3005) que o middleware verifica.
       await page.context().addCookies([{
         name: 'access_token',
         value: MOCK_TOKEN,
@@ -178,7 +176,6 @@ test.describe("Registro", () => {
   test("redireciona para /dashboard após registro bem-sucedido", async ({
     page,
   }) => {
-    // Mesma estratégia do teste de login: rotas antes do goto para evitar race condition.
     let registerDone = false;
 
     await page.route("**/api/auth/me", (route) =>

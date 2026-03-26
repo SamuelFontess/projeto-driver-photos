@@ -244,7 +244,6 @@ test.describe("File Browser — navegação de pastas", () => {
 
     await page.goto("/dashboard");
 
-    // FolderCard é um div com role="button" e aria-label="Abrir pasta {nome}".
     await page.getByRole("button", { name: /Abrir pasta Projetos/ }).click();
 
     await expect(page).toHaveURL(/folder=folder-nav-1/, { timeout: 8000 });
@@ -265,13 +264,11 @@ test.describe("File Browser — navegação de pastas", () => {
           }),
         });
       } else if (url.includes("parentId=folder-nav-2")) {
-        // listagem de subpastas dentro de folder-nav-2
         route.fulfill({
           status: 200,
           body: JSON.stringify({ folders: [], total: 0, page: 1, limit: 50, totalPages: 0 }),
         });
       } else {
-        // listagem raiz
         route.fulfill({
           status: 200,
           body: JSON.stringify({

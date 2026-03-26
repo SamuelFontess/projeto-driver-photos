@@ -110,8 +110,7 @@ test.describe('Página de Família — com família', () => {
 
     await page.goto('/dashboard/family');
 
-    // O nome da família aparece no SelectTrigger (combobox) visível no desktop.
-    // Evita o elemento <p class="sm:hidden"> que está oculto no viewport padrão (1280px).
+    // getByText() resolveria para <p class="sm:hidden"> (oculto no desktop); combobox aponta o SelectTrigger visível.
     await expect(
       page.getByRole('combobox').filter({ hasText: MOCK_FAMILY.name }),
     ).toBeVisible({ timeout: 8000 });

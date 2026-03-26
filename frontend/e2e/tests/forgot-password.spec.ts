@@ -56,15 +56,10 @@ test.describe('Recuperação de senha', () => {
     });
 
     await forgotPage.emailInput.fill('test@driver.com');
-
-    // react-hook-form seta isSubmitting=true sincronamente ao chamar handleSubmit,
-    // antes de qualquer await. Verificamos imediatamente após o click, enquanto o
-    // route handler segura a resposta por 500ms.
     await forgotPage.submitButton.click();
 
-    // forgotPage.submitButton usa getByRole('button', { name: 'Enviar instruções' }),
-    // que para de corresponder quando isSubmitting=true muda o texto para "Enviando...".
-    // Usar o seletor por tipo garante que o mesmo elemento é encontrado em ambos os estados.
+    // forgotPage.submitButton filtra pelo nome "Enviar instruções", que muda para "Enviando..."
+    // com isSubmitting=true — o localizador para de corresponder justamente quando o botão está desabilitado.
     const submitBtn = page.locator('button[type="submit"]');
     await expect(submitBtn).toBeDisabled({ timeout: 3000 });
     await expect(page.getByText('Enviando...')).toBeVisible({ timeout: 3000 });

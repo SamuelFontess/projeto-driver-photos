@@ -39,9 +39,7 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
   }) => {
     const MOCK_USER = { id: '1', email: 'test@driver.com', name: 'Test User' };
 
-    // Registra rotas ANTES do goto — mesma estratégia de auth.spec.ts para evitar
-    // race condition: auth/me → 200 registrado após goto é captado pelo segundo
-    // efeito do React Strict Mode, fazendo PublicOnlyRoute redirecionar antes do fill.
+    // Rotas antes do goto: evita race condition com React Strict Mode (ver auth.spec.ts).
     let loginDone = false;
     await page.route('**/api/auth/me', (route) =>
       route.fulfill({
@@ -73,7 +71,6 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
       route.fulfill({ status: 200, body: JSON.stringify({ files: [], total: 0, page: 1, limit: 50, totalPages: 0 }) }),
     );
 
-    // Tenta acessar rota protegida → redireciona para /login?from=/dashboard/profile
     await page.goto('/dashboard/profile');
     await page.waitForURL(/\/login/, { timeout: 8000 });
 
@@ -81,7 +78,6 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
     await page.getByLabel('Senha').fill('senha123');
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
-    // Deve redirecionar para o caminho original (/dashboard/profile) ou para /dashboard
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 8000 });
   });
 });
