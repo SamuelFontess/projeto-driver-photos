@@ -44,7 +44,7 @@ function fileFilter(
 
 export const files_request_limit = 20;
 
-export const singleFile = multer({
+export const fileUploader = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: max_upload_file_size_bytes },
   fileFilter,

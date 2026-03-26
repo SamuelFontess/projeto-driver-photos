@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { list, upload, download, preview, get, update, remove } from '../controllers/fileController';
 import { authenticate } from '../middleware/auth';
-import { singleFile, files_request_limit } from '../lib/multer';
+import { fileUploader, files_request_limit } from '../lib/multer';
 import { validate } from '../middleware/validate';
 import {
   fileIdParamSchema,
@@ -22,7 +22,7 @@ router.post(
   '/',
   authenticate,
   fileUploadRateLimiter,
-  singleFile.array('files', files_request_limit),
+  fileUploader.array('files', files_request_limit),
   validate(uploadFilesBodySchema),
   upload
 );
