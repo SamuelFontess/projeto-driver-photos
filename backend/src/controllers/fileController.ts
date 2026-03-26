@@ -226,19 +226,33 @@ export async function upload(req: Request, res: Response): Promise<void> {
         metadata: { contentType: mimeType },
       });
 
-      const record = await prisma.file.create({
-        data: {
-          id: fileId,
-          name,
-          path: filePath,
-          size: file.size,
-          mimeType,
-          userId,
-          familyId,
-          folderId,
-        },
-        select: CAMPOS_ARQUIVO,
-      });
+      let record;
+      try {
+        record = await prisma.file.create({
+          data: {
+            id: fileId,
+            name,
+            path: filePath,
+            size: file.size,
+            mimeType,
+            userId,
+            familyId,
+            folderId,
+          },
+          select: CAMPOS_ARQUIVO,
+        });
+      } catch (dbError) {
+        // Prisma failed after Firebase upload succeeded — delete the orphaned file
+        try {
+          await storageFile.delete();
+        } catch (deleteError) {
+          logger.error('Failed to clean up orphaned Firebase file after DB error', {
+            filePath,
+            error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+          });
+        }
+        throw dbError;
+      }
       created.push(record);
     }
 
@@ -295,10 +309,11 @@ export async function download(req: Request, res: Response): Promise<void> {
     }
 
     const safeName = fileRecord.name.replace(/[^\x20-\x7E]/g, "_");
+    const encodedName = encodeURIComponent(fileRecord.name).replace(/'/g, "%27");
     res.setHeader("Content-Type", fileRecord.mimeType);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${safeName.replace(/"/g, '\\"')}"`,
+      `attachment; filename="${safeName.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodedName}`,
     );
 
     await createAuditLog({
@@ -373,11 +388,12 @@ function setPreviewHeaders(
   size: number,
 ): void {
   const safeName = fileName.replace(/[^\x20-\x7E]/g, "_");
+  const encodedName = encodeURIComponent(fileName).replace(/'/g, "%27");
   res.setHeader("Content-Type", mimeType || "application/octet-stream");
   res.setHeader("Content-Length", String(size));
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${safeName.replace(/"/g, '\\"')}"`,
+    `inline; filename="${safeName.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodedName}`,
   );
   res.setHeader("Cache-Control", "private, max-age=300");
 }
