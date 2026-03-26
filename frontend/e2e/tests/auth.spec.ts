@@ -79,11 +79,23 @@ test.describe("Login", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
+        // Set-Cookie necessário: o middleware Next.js verifica o cookie server-side
+        // antes de qualquer chamada de API. Sem ele o middleware redireciona para /login.
+        headers: {
+          "Set-Cookie": `access_token=${MOCK_TOKEN}; Path=/; HttpOnly; SameSite=Strict`,
+        },
         body: JSON.stringify({
           token: MOCK_TOKEN,
           user: MOCK_USER,
           message: "ok",
         }),
+      }),
+    );
+    await page.route("**/api/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: MOCK_USER }),
       }),
     );
     await page.route("**/api/folders**", (route) =>
@@ -166,11 +178,21 @@ test.describe("Registro", () => {
       route.fulfill({
         status: 201,
         contentType: "application/json",
+        headers: {
+          "Set-Cookie": `access_token=${MOCK_TOKEN}; Path=/; HttpOnly; SameSite=Strict`,
+        },
         body: JSON.stringify({
           token: MOCK_TOKEN,
           user: MOCK_USER,
           message: "ok",
         }),
+      }),
+    );
+    await page.route("**/api/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: MOCK_USER }),
       }),
     );
     await page.route("**/api/folders**", (route) =>

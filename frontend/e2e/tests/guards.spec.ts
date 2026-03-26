@@ -48,12 +48,16 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: {
+          'Set-Cookie': 'access_token=mock-token; Path=/; HttpOnly; SameSite=Strict',
+        },
         body: JSON.stringify({ token: 'mock-token', user: MOCK_USER }),
       }),
     );
     await page.route('**/api/auth/me', (route) =>
       route.fulfill({
         status: 200,
+        contentType: 'application/json',
         body: JSON.stringify({ user: MOCK_USER }),
       }),
     );

@@ -11,6 +11,19 @@ const MOCK_TOKEN = "mock-jwt-token-for-e2e-tests";
 
 /** Mocka todos os endpoints necessários para o dashboard funcionar. */
 export async function setupAuthenticatedState(page: Page) {
+  // Planta o cookie access_token para que o middleware Next.js do servidor
+  // deixe as rotas /dashboard/* passarem sem redirecionar para /login
+  await page.context().addCookies([
+    {
+      name: 'access_token',
+      value: MOCK_TOKEN,
+      domain: 'localhost',
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ]);
+
   // Mock GET /api/auth/me → usuário autenticado
   await page.route("**/api/auth/me", (route) => {
     if (route.request().method() === "GET") {
