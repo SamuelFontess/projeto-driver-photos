@@ -1,7 +1,17 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const REFRESH_JWT_SECRET = process.env.REFRESH_JWT_SECRET || 'your-refresh-secret-key';
+// requireEnv throws at module load if the variable is absent.
+// The return type is string (not string | undefined), so all usages below are type-safe.
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} environment variable is required but not set.`);
+  }
+  return value;
+}
+
+const JWT_SECRET = requireEnv('JWT_SECRET');
+const REFRESH_JWT_SECRET = requireEnv('REFRESH_JWT_SECRET');
 
 export interface JWTPayload {
   userId: string;

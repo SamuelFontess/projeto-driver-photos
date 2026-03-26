@@ -39,6 +39,9 @@ if (envFileFromArg) {
 }
 
 async function bootstrap() {
+  const { validateEnv } = await import('./utils/validateEnv');
+  validateEnv();
+
   const { initFirebase } = await import('./lib/firebase');
   const { app } = await import('./app');
   initFirebase();
@@ -59,14 +62,15 @@ async function bootstrap() {
       getRedisClient()
         .then((client) => {
           if (client) {
-            console.log('Redis: connected (cache + email queue)');
+            console.log('Redis cache: connected');
           } else {
-            console.log('Redis: not available (cache/queue will use fallback or skip)');
+            console.log('Redis cache: not available (preview cache will be skipped)');
           }
         })
         .catch(() => {
-          console.log('Redis: not available (cache/queue will use fallback or skip)');
+          console.log('Redis cache: not available (preview cache will be skipped)');
         });
+      console.log('Redis queue: managed by BullMQ (connects on first job publish)');
     });
   }
 }
