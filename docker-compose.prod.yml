@@ -23,15 +23,36 @@ services:
     image: redis:7-alpine
     container_name: driver_redis
     restart: unless-stopped
+    # noeviction: BullMQ job state must never be evicted
     command:
       [
         "redis-server",
         "--appendonly", "no",
-        "--maxmemory", "256mb",
+        "--maxmemory", "128mb",
         "--maxmemory-policy", "noeviction"
       ]
     volumes:
       - redis_data:/data
+    networks:
+      - driver_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  redis-cache:
+    image: redis:7-alpine
+    container_name: driver_redis_cache
+    restart: unless-stopped
+    # allkeys-lru: preview cache entries evicted gracefully when memory is full
+    command:
+      [
+        "redis-server",
+        "--appendonly", "no",
+        "--maxmemory", "128mb",
+        "--maxmemory-policy", "allkeys-lru"
+      ]
     networks:
       - driver_net
     healthcheck:
@@ -63,6 +84,7 @@ services:
       PORT: 8080
       DATABASE_URL: postgresql://${POSTGRES_USER:-driver}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-driver}
       REDIS_URL: redis://redis:6379
+      REDIS_CACHE_URL: redis://redis-cache:6379
       REDIS_CONNECT_TIMEOUT_MS: 300
       JWT_SECRET: ${JWT_SECRET}
       REFRESH_JWT_SECRET: ${REFRESH_JWT_SECRET}
@@ -97,6 +119,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
