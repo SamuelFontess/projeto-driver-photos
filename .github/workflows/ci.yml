@@ -48,6 +48,7 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driver_test
       JWT_SECRET: ci-jwt-secret-placeholder
+      REFRESH_JWT_SECRET: ci-refresh-secret-placeholder
       ADMIN_EMAILS: admin@test.com
       REDIS_URL: redis://localhost:6379
       # Firebase e Brevo não são usados nos testes — Prisma e Firebase são mockados
