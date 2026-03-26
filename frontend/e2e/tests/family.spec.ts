@@ -61,7 +61,7 @@ test.describe('Página de Família — sem família', () => {
     await page.goto('/dashboard/family');
     await page.getByRole('button', { name: /criar família|criar/i }).first().click();
 
-    await expect(page.getByText(/família pronta|família criada/i)).toBeVisible({
+    await expect(page.getByText('Família pronta', { exact: true })).toBeVisible({
       timeout: 8000,
     });
   });
@@ -86,7 +86,7 @@ test.describe('Página de Família — sem família', () => {
     await page.goto('/dashboard/family');
     await page.getByRole('button', { name: /criar família|criar/i }).first().click();
 
-    await expect(page.getByText('Erro ao criar família')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Erro ao criar família', { exact: true })).toBeVisible({ timeout: 8000 });
   });
 });
 
@@ -110,7 +110,7 @@ test.describe('Página de Família — com família', () => {
 
     await page.goto('/dashboard/family');
 
-    await expect(page.getByText(MOCK_FAMILY.name)).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText(MOCK_FAMILY.name, { exact: true })).toBeVisible({ timeout: 8000 });
   });
 
   test('exibe estado vazio no FileBrowser da família quando não há arquivos', async ({

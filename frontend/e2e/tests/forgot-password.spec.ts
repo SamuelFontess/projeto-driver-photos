@@ -31,18 +31,19 @@ test.describe('Recuperação de senha', () => {
 
     await forgotPage.submit('test@driver.com');
 
-    await expect(page.getByText('Solicitação enviada')).toBeVisible({ timeout: 8000 });
+    // { exact: true } evita strict mode violation com o aria-live que concatena o conteúdo do toast
+    await expect(page.getByText('Solicitação enviada', { exact: true })).toBeVisible({ timeout: 8000 });
   });
 
   test('exibe erro se o email for inválido (validação client-side)', async ({ page }) => {
     const forgotPage = new ForgotPasswordPage(page);
     await forgotPage.goto();
 
-    await forgotPage.emailInput.fill('email-invalido');
+    // Submete com o campo vazio: o browser não bloqueia (type=email só valida formato
+    // se o campo tiver valor), então o react-hook-form/Zod executa e exibe "Email inválido".
     await forgotPage.submitButton.click();
 
-    // O formulário usa zod — deve exibir mensagem de validação sem chamar a API
-    await expect(page.getByText(/email|inválido/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Email inválido', { exact: true })).toBeVisible({ timeout: 5000 });
   });
 
   test('botão fica desabilitado e exibe "Enviando..." durante submissão', async ({ page }) => {
@@ -51,14 +52,19 @@ test.describe('Recuperação de senha', () => {
 
     await page.route('**/api/auth/forgot-password', async (route) => {
       await new Promise((r) => setTimeout(r, 500));
-      route.fulfill({ status: 200, body: JSON.stringify({ message: 'ok' }) });
+      await route.fulfill({ status: 200, body: JSON.stringify({ message: 'ok' }) });
     });
 
     await forgotPage.emailInput.fill('test@driver.com');
-    await forgotPage.submitButton.click();
 
-    await expect(forgotPage.submitButton).toBeDisabled();
-    await expect(page.getByText('Enviando...')).toBeVisible();
+    // waitForRequest garante que a request foi iniciada antes de checar o estado do botão,
+    // evitando race condition entre o click e a propagação do isSubmitting=true no React.
+    const requestPromise = page.waitForRequest('**/api/auth/forgot-password');
+    await forgotPage.submitButton.click();
+    await requestPromise;
+
+    await expect(forgotPage.submitButton).toBeDisabled({ timeout: 2000 });
+    await expect(page.getByText('Enviando...')).toBeVisible({ timeout: 2000 });
   });
 
   test('exibe toast de erro se a API retornar falha', async ({ page }) => {
@@ -75,7 +81,8 @@ test.describe('Recuperação de senha', () => {
 
     await forgotPage.submit('test@driver.com');
 
-    await expect(page.getByText('Erro ao solicitar redefinição')).toBeVisible({ timeout: 8000 });
+    // { exact: true } evita strict mode violation com o aria-live que concatena o conteúdo do toast
+    await expect(page.getByText('Erro ao solicitar redefinição', { exact: true })).toBeVisible({ timeout: 8000 });
   });
 
   test('"Voltar para login" navega para /login', async ({ page }) => {

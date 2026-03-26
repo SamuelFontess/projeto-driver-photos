@@ -41,7 +41,7 @@ test.describe('Redefinição de senha', () => {
     await page.getByLabel('Confirmar senha').fill('novaSenha123');
     await page.getByRole('button', { name: 'Redefinir senha' }).click();
 
-    await expect(page.getByText('Senha redefinida')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Senha redefinida', { exact: true })).toBeVisible({ timeout: 8000 });
     await expect(page).toHaveURL(/\/login/, { timeout: 8000 });
   });
 

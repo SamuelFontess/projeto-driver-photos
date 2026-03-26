@@ -75,22 +75,24 @@ test.describe("Login", () => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
 
-    await page.route("**/api/auth/login", (route) =>
-      route.fulfill({
+    // addCookies() em vez de Set-Cookie header: o Set-Cookie via route.fulfill() seta o
+    // cookie no domínio da API (localhost:8080), não no domínio do Next.js (localhost:3005)
+    // onde o middleware verifica. addCookies() com domain 'localhost' cobre ambas as portas.
+    await page.route("**/api/auth/login", async (route) => {
+      await page.context().addCookies([{
+        name: 'access_token',
+        value: MOCK_TOKEN,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'Strict',
+      }]);
+      await route.fulfill({
         status: 200,
         contentType: "application/json",
-        // Set-Cookie necessário: o middleware Next.js verifica o cookie server-side
-        // antes de qualquer chamada de API. Sem ele o middleware redireciona para /login.
-        headers: {
-          "Set-Cookie": `access_token=${MOCK_TOKEN}; Path=/; HttpOnly; SameSite=Strict`,
-        },
-        body: JSON.stringify({
-          token: MOCK_TOKEN,
-          user: MOCK_USER,
-          message: "ok",
-        }),
-      }),
-    );
+        body: JSON.stringify({ token: MOCK_TOKEN, user: MOCK_USER, message: "ok" }),
+      });
+    });
     await page.route("**/api/auth/me", (route) =>
       route.fulfill({
         status: 200,
@@ -174,20 +176,21 @@ test.describe("Registro", () => {
     const registerPage = new RegisterPage(page);
     await registerPage.goto();
 
-    await page.route("**/api/auth/register", (route) =>
-      route.fulfill({
+    await page.route("**/api/auth/register", async (route) => {
+      await page.context().addCookies([{
+        name: 'access_token',
+        value: MOCK_TOKEN,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'Strict',
+      }]);
+      await route.fulfill({
         status: 201,
         contentType: "application/json",
-        headers: {
-          "Set-Cookie": `access_token=${MOCK_TOKEN}; Path=/; HttpOnly; SameSite=Strict`,
-        },
-        body: JSON.stringify({
-          token: MOCK_TOKEN,
-          user: MOCK_USER,
-          message: "ok",
-        }),
-      }),
-    );
+        body: JSON.stringify({ token: MOCK_TOKEN, user: MOCK_USER, message: "ok" }),
+      });
+    });
     await page.route("**/api/auth/me", (route) =>
       route.fulfill({
         status: 200,

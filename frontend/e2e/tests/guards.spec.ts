@@ -68,6 +68,8 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
       route.fulfill({ status: 200, body: JSON.stringify({ files: [], total: 0, page: 1, limit: 50, totalPages: 0 }) }),
     );
 
+    // Aguarda o redirect para /login antes de interagir (evita flakiness por timing)
+    await page.waitForURL(/\/login/, { timeout: 8000 });
     await page.getByLabel('Email').fill('test@driver.com');
     await page.getByLabel('Senha').fill('senha123');
     await page.getByRole('button', { name: 'Entrar' }).click();

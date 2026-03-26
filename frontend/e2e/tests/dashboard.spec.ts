@@ -237,7 +237,7 @@ test.describe("File Browser — navegação de pastas", () => {
 
     await page.goto("/dashboard");
 
-    await page.getByText("Projetos").dblclick();
+    await page.getByText("Projetos").click();
 
     await expect(page).toHaveURL(/folderId=folder-nav-1/, { timeout: 8000 });
   });
@@ -274,7 +274,7 @@ test.describe("File Browser — navegação de pastas", () => {
     });
 
     await page.goto("/dashboard");
-    await page.getByText("Documentos Legais").dblclick();
+    await page.getByText("Documentos Legais").click();
 
     await expect(
       page
