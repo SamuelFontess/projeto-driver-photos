@@ -11,13 +11,25 @@ export function validateEnv(): void {
     'JWT_SECRET',
     'REFRESH_JWT_SECRET',
     'DATABASE_URL',
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_CLIENT_EMAIL',
-    'FIREBASE_PRIVATE_KEY',
-    'FIREBASE_STORAGE_BUCKET',
   ];
 
   const missing = required.filter((key) => !process.env[key]);
+
+  const hasIndividualVars =
+    !!process.env.FIREBASE_PROJECT_ID &&
+    !!process.env.FIREBASE_CLIENT_EMAIL &&
+    !!process.env.FIREBASE_PRIVATE_KEY;
+  const hasJsonEnv = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const hasCredFile = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  if (!hasIndividualVars && !hasJsonEnv && !hasCredFile) {
+    missing.push(
+      'FIREBASE credentials — set one of: ' +
+        'GOOGLE_APPLICATION_CREDENTIALS, ' +
+        'FIREBASE_SERVICE_ACCOUNT_JSON, ' +
+        'or all three of FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY'
+    );
+  }
 
   if (missing.length > 0) {
     throw new Error(
