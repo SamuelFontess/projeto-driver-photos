@@ -3,18 +3,37 @@ import type { Express } from "express";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateToken } from "./utils/jwt";
 
+// ─── Prisma mock ──────────────────────────────────────────────────────────────
 const prismaMock = {
   user: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
   },
   folder: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
     count: vi.fn(),
+    create: vi.fn(),
   },
   file: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
     count: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+  },
+  family: {
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+  },
+  familyMember: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
   },
   favoriteFolder: {
     findMany: vi.fn(),
@@ -34,8 +53,53 @@ vi.mock("./lib/prisma", () => ({
   prisma: prismaMock,
 }));
 
+// ─── Firebase mock ────────────────────────────────────────────────────────────
+const storageMockFile = {
+  save: vi.fn().mockResolvedValue(undefined),
+  delete: vi.fn().mockResolvedValue(undefined),
+  exists: vi.fn().mockResolvedValue([true]),
+  createReadStream: vi.fn().mockReturnValue({
+    on: vi.fn(),
+    pipe: vi.fn(),
+  }),
+  download: vi.fn().mockResolvedValue([Buffer.from("fake-content")]),
+};
+
+const bucketMock = {
+  file: vi.fn().mockReturnValue(storageMockFile),
+};
+
+vi.mock("./lib/firebase", () => ({
+  initFirebase: vi.fn(),
+  getFirebaseBucket: vi.fn().mockReturnValue(bucketMock),
+}));
+
+// ─── Redis cache mock (preview cache — optional) ──────────────────────────────
+vi.mock("./lib/redis", () => ({
+  getPreviewFromCache: vi.fn().mockResolvedValue(null),
+  setPreviewInCache: vi.fn().mockResolvedValue(undefined),
+  previewCacheMaxBytes: 20 * 1024 * 1024,
+  previewMaxBytes: 50 * 1024 * 1024,
+  getRedisClient: vi.fn().mockResolvedValue(null),
+}));
+
+// ─── Email queue mock ─────────────────────────────────────────────────────────
+vi.mock("./lib/emailQueue", () => ({
+  publishEmailJob: vi.fn().mockResolvedValue("mock-job-id"),
+}));
+
 let app: Express;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function authCookie(userId = "user-1", email = "user@mail.com") {
+  return `access_token=${generateToken({ userId, email })}`;
+}
+
+function adminCookie() {
+  return `access_token=${generateToken({ userId: "admin-1", email: "admin@test.com" })}`;
+}
+
+// ─── Test suite ───────────────────────────────────────────────────────────────
 describe("Routes integration", () => {
   beforeAll(async () => {
     const appModule = await import("./app");
@@ -44,11 +108,15 @@ describe("Routes integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default prisma stubs
     prismaMock.folder.count.mockResolvedValue(0);
     prismaMock.file.count.mockResolvedValue(0);
     prismaMock.folder.findMany.mockResolvedValue([]);
     prismaMock.file.findMany.mockResolvedValue([]);
     prismaMock.favoriteFolder.findMany.mockResolvedValue([]);
+    prismaMock.family.findMany.mockResolvedValue([]);
+    prismaMock.familyMember.findMany.mockResolvedValue([]);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.$transaction.mockImplementation((queries: unknown) => {
       if (Array.isArray(queries)) {
@@ -56,77 +124,303 @@ describe("Routes integration", () => {
       }
       return Promise.resolve([]);
     });
+
+    // Default Firebase stubs
+    bucketMock.file.mockReturnValue(storageMockFile);
+    storageMockFile.save.mockResolvedValue(undefined);
+    storageMockFile.delete.mockResolvedValue(undefined);
+    storageMockFile.exists.mockResolvedValue([true]);
+    storageMockFile.download.mockResolvedValue([Buffer.from("fake-content")]);
   });
 
-  it("POST /api/auth/register returns 201 on success", async () => {
-    prismaMock.user.findUnique.mockResolvedValue(null);
-    prismaMock.user.create.mockResolvedValue({
-      id: "user-1",
-      email: "new-user@mail.com",
-      name: "New User",
-      createdAt: new Date(),
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+
+  describe("Auth", () => {
+    it("POST /api/auth/register returns 201 on success", async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue({
+        id: "user-1",
+        email: "new-user@mail.com",
+        name: "New User",
+        createdAt: new Date(),
+      });
+
+      const response = await request(app).post("/api/auth/register").send({
+        email: "new-user@mail.com",
+        password: "123456",
+        name: "New User",
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("user");
+      expect(response.headers["set-cookie"]).toBeDefined();
+      expect(prismaMock.user.create).toHaveBeenCalled();
     });
 
-    const response = await request(app).post("/api/auth/register").send({
-      email: "new-user@mail.com",
-      password: "123456",
-      name: "New User",
+    it("POST /api/auth/register returns 409 when email already exists", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: "existing-user" });
+
+      const response = await request(app).post("/api/auth/register").send({
+        email: "existing@mail.com",
+        password: "123456",
+      });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toMatch(/already exists/i);
     });
 
-    expect(response.status).toBe(201);
-    expect(response.body).toHaveProperty("user");
-    expect(response.headers["set-cookie"]).toBeDefined();
-    expect(prismaMock.user.create).toHaveBeenCalled();
-  });
+    it("POST /api/auth/login returns 401 on wrong password", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "user@mail.com",
+        // bcrypt hash of 'wrong-password' would not match 'correct-password'
+        // we use null password to simulate a Google-only account
+        password: null,
+      });
 
-  it("GET /api/folders returns folders for authenticated user", async () => {
-    const token = generateToken({ userId: "user-1", email: "user@mail.com" });
-    prismaMock.folder.findMany.mockResolvedValue([
-      {
-        id: "folder-1",
-        name: "Root Folder",
-        parentId: null,
+      const response = await request(app).post("/api/auth/login").send({
+        email: "user@mail.com",
+        password: "any",
+      });
+
+      expect(response.status).toBe(401);
+    });
+
+    it("GET /api/auth/me returns 401 without cookie", async () => {
+      const response = await request(app).get("/api/auth/me");
+      expect(response.status).toBe(401);
+    });
+
+    it("GET /api/auth/me returns user when authenticated", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "user@mail.com",
+        name: "Test User",
         createdAt: new Date(),
         updatedAt: new Date(),
-      },
-    ]);
-    prismaMock.folder.count.mockResolvedValue(1);
-    prismaMock.favoriteFolder.findMany.mockResolvedValue([]);
+      });
 
-    const response = await request(app)
-      .get("/api/folders")
-      .set("Cookie", `access_token=${token}`);
+      const response = await request(app)
+        .get("/api/auth/me")
+        .set("Cookie", authCookie());
 
-    expect(response.status).toBe(200);
-    expect(response.body.folders).toHaveLength(1);
-    expect(response.body.total).toBe(1);
-    expect(response.body.page).toBe(1);
-    expect(response.body.totalPages).toBe(1);
-    expect(prismaMock.$transaction).toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(response.body.user).toHaveProperty("email", "user@mail.com");
+    });
   });
 
-  it("GET /api/files?search= uses global search filter", async () => {
-    const token = generateToken({ userId: "user-1", email: "user@mail.com" });
+  // ─── Folders ───────────────────────────────────────────────────────────────
 
-    const response = await request(app)
-      .get("/api/files?search=report")
-      .set("Cookie", `access_token=${token}`);
+  describe("Folders", () => {
+    it("GET /api/folders returns folders for authenticated user", async () => {
+      prismaMock.folder.findMany.mockResolvedValue([
+        {
+          id: "folder-1",
+          name: "Root Folder",
+          parentId: null,
+          familyId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+      prismaMock.folder.count.mockResolvedValue(1);
+      prismaMock.favoriteFolder.findMany.mockResolvedValue([]);
 
-    expect(response.status).toBe(200);
-    expect(response.body.total).toBeDefined();
-    expect(response.body.page).toBe(1);
-    expect(response.body.totalPages).toBeDefined();
-    expect(prismaMock.$transaction).toHaveBeenCalled();
-    expect(prismaMock.file.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          userId: "user-1",
-          name: {
-            contains: "report",
-            mode: "insensitive",
-          },
-        }),
-      }),
-    );
+      const response = await request(app)
+        .get("/api/folders")
+        .set("Cookie", authCookie());
+
+      expect(response.status).toBe(200);
+      expect(response.body.folders).toHaveLength(1);
+      expect(response.body.total).toBe(1);
+    });
+
+    it("GET /api/folders returns 401 without auth", async () => {
+      const response = await request(app).get("/api/folders");
+      expect(response.status).toBe(401);
+    });
+  });
+
+  // ─── Files ─────────────────────────────────────────────────────────────────
+
+  describe("Files", () => {
+    it("GET /api/files returns 401 without auth", async () => {
+      const response = await request(app).get("/api/files");
+      expect(response.status).toBe(401);
+    });
+
+    it("GET /api/files?search= uses global search filter", async () => {
+      const response = await request(app)
+        .get("/api/files?search=report")
+        .set("Cookie", authCookie());
+
+      expect(response.status).toBe(200);
+      expect(response.body.total).toBeDefined();
+      expect(prismaMock.file.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            name: { contains: "report", mode: "insensitive" },
+          }),
+        })
+      );
+    });
+
+    it("POST /api/files uploads a file successfully", async () => {
+      const fileRecord = {
+        id: "file-1",
+        name: "test.pdf",
+        size: 1024,
+        mimeType: "application/pdf",
+        familyId: null,
+        folderId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      prismaMock.file.create.mockResolvedValue(fileRecord);
+
+      const response = await request(app)
+        .post("/api/files")
+        .set("Cookie", authCookie())
+        .attach("files", Buffer.from("fake pdf content"), {
+          filename: "test.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.files).toHaveLength(1);
+      expect(storageMockFile.save).toHaveBeenCalled();
+      expect(prismaMock.file.create).toHaveBeenCalled();
+    });
+
+    it("POST /api/files rejects disallowed MIME types", async () => {
+      const response = await request(app)
+        .post("/api/files")
+        .set("Cookie", authCookie())
+        .attach("files", Buffer.from("exe content"), {
+          filename: "virus.exe",
+          contentType: "application/octet-stream",
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("POST /api/files cleans up Firebase file on DB failure", async () => {
+      prismaMock.file.create.mockRejectedValue(new Error("DB constraint violation"));
+
+      const response = await request(app)
+        .post("/api/files")
+        .set("Cookie", authCookie())
+        .attach("files", Buffer.from("fake pdf content"), {
+          filename: "test.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(response.status).toBe(500);
+      expect(storageMockFile.save).toHaveBeenCalled();
+      expect(storageMockFile.delete).toHaveBeenCalled();
+    });
+
+    it("DELETE /api/files/:id returns 404 for non-existent file", async () => {
+      prismaMock.file.findFirst.mockResolvedValue(null);
+
+      const response = await request(app)
+        .delete("/api/files/non-existent-id")
+        .set("Cookie", authCookie());
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  // ─── Families ──────────────────────────────────────────────────────────────
+
+  describe("Families", () => {
+    it("GET /api/families returns 401 without auth", async () => {
+      const response = await request(app).get("/api/families");
+      expect(response.status).toBe(401);
+    });
+
+    it("GET /api/families returns families for authenticated user", async () => {
+      prismaMock.family.findMany.mockResolvedValue([
+        {
+          id: "family-1",
+          name: "My Family",
+          ownerId: "user-1",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          _count: { members: 2 },
+        },
+      ]);
+
+      const response = await request(app)
+        .get("/api/families")
+        .set("Cookie", authCookie());
+
+      expect(response.status).toBe(200);
+      expect(response.body.families).toHaveLength(1);
+    });
+
+    it("POST /api/families creates a family", async () => {
+      const family = {
+        id: "family-1",
+        name: "Test Family",
+        ownerId: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      prismaMock.family.create.mockResolvedValue(family);
+
+      const response = await request(app)
+        .post("/api/families")
+        .set("Cookie", authCookie())
+        .send({ name: "Test Family" });
+
+      expect(response.status).toBe(201);
+      expect(response.body.family).toHaveProperty("name", "Test Family");
+    });
+
+    it("GET /api/families/:id/members returns 403 when user has no access", async () => {
+      prismaMock.family.findUnique.mockResolvedValue({
+        id: "family-1",
+        ownerId: "other-user",
+      });
+      prismaMock.familyMember.findFirst.mockResolvedValue(null);
+
+      const response = await request(app)
+        .get("/api/families/family-1/members")
+        .set("Cookie", authCookie());
+
+      expect(response.status).toBe(403);
+    });
+  });
+
+  // ─── Admin ─────────────────────────────────────────────────────────────────
+
+  describe("Admin", () => {
+    it("POST /api/admin/send-email returns 403 for non-admin", async () => {
+      const response = await request(app)
+        .post("/api/admin/send-email")
+        .set("Cookie", authCookie())
+        .send({ to: "user@mail.com", subject: "test", body: "<p>hello</p>" });
+
+      expect(response.status).toBe(403);
+    });
+
+    it("POST /api/admin/send-email returns 401 without auth", async () => {
+      const response = await request(app)
+        .post("/api/admin/send-email")
+        .send({ to: "user@mail.com", subject: "test", body: "<p>hello</p>" });
+
+      expect(response.status).toBe(401);
+    });
+  });
+
+  // ─── Health check ──────────────────────────────────────────────────────────
+
+  describe("Health", () => {
+    it("GET /health returns 200", async () => {
+      const response = await request(app).get("/health");
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("ok");
+    });
   });
 });

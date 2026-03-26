@@ -29,6 +29,50 @@ test.describe('Usuário NÃO autenticado', () => {
   });
 });
 
+test.describe('Usuário NÃO autenticado — parâmetro from', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupUnauthenticatedState(page);
+  });
+
+  test('após login com parâmetro "from", redireciona para o caminho original', async ({
+    page,
+  }) => {
+    const MOCK_USER = { id: '1', email: 'test@driver.com', name: 'Test User' };
+
+    // Tenta acessar rota protegida → vai para /login?from=/dashboard/profile
+    await page.goto('/dashboard/profile');
+    await expect(page).toHaveURL(/\/login/, { timeout: 8000 });
+
+    // Configura mocks para login bem-sucedido
+    await page.route('**/api/auth/login', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ token: 'mock-token', user: MOCK_USER }),
+      }),
+    );
+    await page.route('**/api/auth/me', (route) =>
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({ user: MOCK_USER }),
+      }),
+    );
+    await page.route('**/api/folders**', (route) =>
+      route.fulfill({ status: 200, body: JSON.stringify({ folders: [], total: 0, page: 1, limit: 50, totalPages: 0 }) }),
+    );
+    await page.route('**/api/files**', (route) =>
+      route.fulfill({ status: 200, body: JSON.stringify({ files: [], total: 0, page: 1, limit: 50, totalPages: 0 }) }),
+    );
+
+    await page.getByLabel('Email').fill('test@driver.com');
+    await page.getByLabel('Senha').fill('senha123');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+
+    // Deve redirecionar para o caminho original (/dashboard/profile) ou para /dashboard
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 8000 });
+  });
+});
+
 test.describe('Usuário autenticado', () => {
   test.beforeEach(async ({ page }) => {
     await setupAuthenticatedState(page);

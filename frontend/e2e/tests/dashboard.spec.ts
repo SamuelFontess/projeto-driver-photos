@@ -211,6 +211,133 @@ test.describe("File Browser — com pastas e arquivos", () => {
   });
 });
 
+test.describe("File Browser — navegação de pastas", () => {
+  test("clicar em uma pasta atualiza a URL com folderId", async ({
+    authenticatedPage: page,
+  }) => {
+    await page.route("**/api/folders**", (route) =>
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          folders: [
+            {
+              id: "folder-nav-1",
+              name: "Projetos",
+              parentId: null,
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 50,
+          totalPages: 1,
+        }),
+      }),
+    );
+
+    await page.goto("/dashboard");
+
+    await page.getByText("Projetos").dblclick();
+
+    await expect(page).toHaveURL(/folderId=folder-nav-1/, { timeout: 8000 });
+  });
+
+  test("breadcrumb exibe o nome da pasta ao navegar para dentro", async ({
+    authenticatedPage: page,
+  }) => {
+    await page.route("**/api/folders**", (route) => {
+      const url = route.request().url();
+      if (url.includes("parentId=folder-nav-2") || url.includes("folderId=folder-nav-2")) {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({ folders: [], total: 0, page: 1, limit: 50, totalPages: 0 }),
+        });
+      } else {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            folders: [
+              {
+                id: "folder-nav-2",
+                name: "Documentos Legais",
+                parentId: null,
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+            total: 1,
+            page: 1,
+            limit: 50,
+            totalPages: 1,
+          }),
+        });
+      }
+    });
+
+    await page.goto("/dashboard");
+    await page.getByText("Documentos Legais").dblclick();
+
+    await expect(
+      page
+        .getByRole("navigation", { name: "Localização atual" })
+        .getByText("Documentos Legais"),
+    ).toBeVisible({ timeout: 8000 });
+  });
+
+  test("botão de upload de arquivo está visível", async ({
+    authenticatedPage: page,
+  }) => {
+    await page.goto("/dashboard");
+
+    await expect(
+      page.getByRole("button", { name: "Enviar arquivo", exact: true }),
+    ).toBeVisible({ timeout: 8000 });
+  });
+});
+
+test.describe("File Browser — busca", () => {
+  test("digitar na busca filtra resultados pelo nome", async ({
+    authenticatedPage: page,
+  }) => {
+    await page.route("**/api/files**", (route) => {
+      const url = route.request().url();
+      if (url.includes("search=relatorio") || url.includes("q=relatorio")) {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            files: [
+              {
+                id: "f-search-1",
+                name: "relatorio-anual.pdf",
+                mimeType: "application/pdf",
+                size: 51200,
+                folderId: null,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            total: 1,
+            page: 1,
+            limit: 50,
+            totalPages: 1,
+          }),
+        });
+      } else {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({ files: [], total: 0, page: 1, limit: 50, totalPages: 0 }),
+        });
+      }
+    });
+
+    const dashboard = new DashboardPage(page);
+    await dashboard.goto();
+
+    await dashboard.searchInput.fill("relatorio");
+    await page.waitForTimeout(400); // debounce
+
+    await expect(page.getByText("relatorio-anual.pdf")).toBeVisible({ timeout: 8000 });
+  });
+});
+
 test.describe("Página de Perfil", () => {
   test("exibe formulário com nome e email pré-preenchidos", async ({
     authenticatedPage: page,
