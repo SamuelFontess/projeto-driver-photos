@@ -20,7 +20,7 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
 } from '../validation/authSchemas';
-import { authRateLimiter, refreshRateLimiter } from '../middleware/rateLimit';
+import { authRateLimiter, forgotPasswordRateLimiter, refreshRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -28,7 +28,7 @@ const router = Router();
 router.post('/register', authRateLimiter, validate(registerSchema), register);
 router.post('/login', authRateLimiter, validate(loginSchema), login);
 router.post('/google', authRateLimiter, validate(googleAuthSchema), googleAuth);
-router.post('/forgot-password', authRateLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post('/forgot-password', forgotPasswordRateLimiter, validate(forgotPasswordSchema), forgotPassword);
 router.post('/reset-password', authRateLimiter, validate(resetPasswordSchema), resetPassword);
 
 // Rotas protegidas — sem rate limit (/me, /logout protegidos pelo authenticate)
