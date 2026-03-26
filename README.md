@@ -1,51 +1,56 @@
 # Projeto Driver
 
-Aplicação fullstack de armazenamento de arquivos em nuvem, inspirada no Google Drive. Permite que usuários façam upload, organizem e visualizem arquivos em pastas hierárquicas, além de criar espaços compartilhados (famílias) com outros usuários — tudo com autenticação, controle de acesso e envio de e-mails transacionais via fila assíncrona.
+Aplicação fullstack de armazenamento de arquivos em nuvem, inspirada no Google Drive. Permite que usuários façam upload, organizem e visualizem arquivos em pastas hierárquicas, além de criar espaços compartilhados (famílias) com outros usuários — tudo com autenticação por JWT em cookies httpOnly, controle de acesso granular e envio de e-mails transacionais via fila assíncrona.
 
 ---
 
 ## Funcionalidades
 
 ### Autenticação
-- Cadastro e login com e-mail/senha
-- Login social com **Google** (via Firebase Auth)
-- Recuperação de senha com link enviado por e-mail (token com TTL de 30 min)
-- Proteção de rotas: JWT no header `Authorization: Bearer <token>`
+- Cadastro e login com e-mail/senha (bcrypt)
+- Login social com **Google** (via Firebase Auth — ID token verificado no backend)
+- Recuperação de senha com link enviado por e-mail (token SHA-256 com TTL de 30 min)
+- **Access token** (15 min) + **Refresh token** (30 dias) em cookies httpOnly — sem localStorage
+- Proteção de rotas: Next.js Edge Middleware verifica o cookie `access_token` antes de servir HTML
 
 ### Gerenciamento de Arquivos
-- Upload de múltiplos arquivos com validação de tipo MIME e tamanho
-- Armazenamento no **Firebase Storage**
-- Download direto com URL assinada
+- Upload de múltiplos arquivos com validação de tipo MIME e tamanho (configurável, padrão 10 MB)
+- Armazenamento no **Firebase Storage** — upload direto pelo backend, sem passar pelo cliente
+- Download com `Content-Disposition` RFC 5987 (suporte a nomes com acentos e caracteres especiais)
 - Preview em tempo real para imagens, PDFs e arquivos de texto — com cache no **Redis**
 - Renomear e mover arquivos entre pastas
-- Exclusão com remoção do Storage
+- Exclusão com remoção atômica do Storage (cleanup do Firebase em falha do banco)
 
 ### Pastas
-- Hierarquia de pastas com suporte a aninhamento ilimitado
-- Navegação via breadcrumb
-- Prevenção de ciclos ao mover (uma pasta não pode ser movida para dentro de si mesma ou de seus descendentes)
+- Hierarquia ilimitada via `parentId` (auto-relacionamento)
+- Navegação via breadcrumb com URL parametrizada (`?folderId=...`)
+- Prevenção de ciclos ao mover (uma pasta não pode ser movida para dentro de si mesma ou descendentes)
 - Exclusão em cascata (remove subpastas e arquivos)
+- Pastas favoritas por usuário
 
 ### Famílias (Espaço Colaborativo)
 - Cada usuário pode criar uma família e convidar membros por e-mail
 - Convite enviado via e-mail transacional (BullMQ + email-worker)
 - Fluxo de aceite/recusa de convite
-- Arquivos e pastas podem pertencer a uma família, tornando-os acessíveis a todos os membros aceitos
-- Gerenciamento de membros (remover membros, visualizar lista)
-- Apenas o dono da família pode gerenciar configurações
+- Arquivos e pastas podem pertencer a uma família — acessíveis a todos os membros aceitos
+- Gerenciamento de membros: listar, remover
+- Apenas o dono da família pode gerenciar configurações e excluir a família
 
-### Segurança e Observabilidade
-- **Rate limiting** nas rotas de autenticação (20 req/15min) e upload (15 req/60s)
-- **Audit logs** para todas as ações relevantes (com IP, user agent e metadados)
-- Hashing de senha com **bcryptjs**
-- Validação de dados com **Zod** em todas as rotas
+### Segurança
+- **Rate limiting** por rota: auth (20 req/15min), upload (15 req/60s), forgot-password (5 req/15min)
+- **CORS** restrito ao `FRONTEND_URL` configurado
+- **`trust proxy 1`** — rate limiting funciona corretamente atrás de nginx/proxy reverso
+- **`COOKIE_SECURE=true`** em produção (requer HTTPS)
+- Validação de todos os inputs com **Zod**
+- **Audit logs** no banco para todas as ações sensíveis (upload, download, delete, login, família)
+- Startup validation: servidor recusa iniciar se qualquer variável crítica estiver ausente
 
 ### Fila de E-mails (email-worker)
-- Publicação assíncrona de jobs via **BullMQ + Redis**
+- Backend publica jobs via **BullMQ** (Redis `noeviction`)
 - Jobs suportados: `family_invite` e `forgot_password`
-- Retry automático: 3 tentativas com backoff exponencial (2s base)
-- Worker separado (`email-worker`) consome a fila e envia e-mails via Gmail SMTP ou Resend
-- Dashboard visual da fila via **Bull Board** (`/admin/queues`)
+- Retry automático: 3 tentativas com backoff exponencial
+- Worker separado (`email-worker`) consome a fila e envia via **Brevo**
+- Worker conectado ao mesmo Redis do BullMQ — sem dependência do backend
 
 ---
 
@@ -56,48 +61,87 @@ Aplicação fullstack de armazenamento de arquivos em nuvem, inspirada no Google
 | Frontend | Next.js 14 (App Router), React 18, TypeScript |
 | Estilização | Tailwind CSS, Radix UI, Lucide Icons |
 | Gerenciamento de estado | React Context + TanStack React Query |
-| Backend | Node.js, Express, TypeScript |
-| Banco de dados | PostgreSQL + Prisma ORM |
+| Backend | Node.js 22, Express, TypeScript |
+| Banco de dados | PostgreSQL 16 + Prisma ORM |
 | Armazenamento | Firebase Storage |
 | Autenticação social | Firebase Auth (Google) |
-| Cache | Redis (preview de arquivos) |
-| Fila de mensagens | BullMQ + Redis |
+| Cache de preview | Redis (`allkeys-lru`, 128 MB) |
+| Fila de mensagens | BullMQ + Redis (`noeviction`, 128 MB) |
 | Validação | Zod |
-| Testes | Vitest |
+| Testes backend | Vitest + Supertest (19 testes de integração) |
+| Testes frontend | Vitest + Testing Library |
+| Testes E2E | Playwright (34+ testes) |
 
 ---
 
 ## Arquitetura
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Railway                              │
-│                                                             │
-│  ┌──────────────┐   REST API   ┌──────────────────────┐    │
-│  │   Frontend   │◄────────────►│  Backend (Express)   │    │
-│  │  (Next.js)   │              │                      │    │
-│  └──────────────┘              │  ┌────────────────┐  │    │
-│                                │  │ Prisma / PgSQL │  │    │
-│                                │  └────────────────┘  │    │
-│                                │  ┌────────────────┐  │    │
-│                                │  │ Firebase Admin │  │    │
-│                                │  │   (Storage)    │  │    │
-│                                │  └────────────────┘  │    │
-│                                │  ┌────────────────┐  │    │
-│                                │  │  Redis (cache) │  │    │
-│                                │  │  BullMQ (fila) │  │    │
-│                                │  └────────────────┘  │    │
-│                                └──────────────────────┘    │
-│                                          │                  │
-│                               publica job na fila           │
-│                                          ▼                  │
-│                                ┌──────────────────┐        │
-│                                │   email-worker   │        │
-│                                │ (serviço separado)│        │
-│                                │  BullMQ consumer │        │
-│                                │  Gmail / Resend  │        │
-│                                └──────────────────┘        │
-└─────────────────────────────────────────────────────────────┘
+                      Internet
+                          │
+                     nginx (host)
+                    HTTPS termination
+                          │
+          ┌───────────────┴───────────────┐
+          ▼                               ▼
+  :3000 (frontend)                :8080 (backend)
+  Next.js                         Express + TypeScript
+  Edge Middleware                         │
+  (cookie check)           ┌─────────────┼─────────────────┐
+                            ▼             ▼                  ▼
+                     PostgreSQL     Firebase Admin      Redis (dois)
+                     Prisma ORM     Storage SDK         ├── :6379 noeviction
+                     (metadados)    (arquivos)          │   BullMQ email queue
+                                                        └── :6380 allkeys-lru
+                                                            Preview cache
+
+                    BullMQ publica job
+                            │
+                            ▼
+                      email-worker
+                      BullMQ consumer
+                      Brevo API
+```
+
+### Dois Redis — por que?
+
+| Instância | Política | Uso | Port (dev) |
+|---|---|---|---|
+| `redis` | `noeviction` | BullMQ — jobs de email. **Nunca pode perder dados.** | 6379 |
+| `redis-cache` | `allkeys-lru` | Cache de preview de arquivos. Pode ser eviccionado. | 6380 |
+
+Em produção (Docker Compose), as URLs são fixadas internamente: `redis://redis:6379` e `redis://redis-cache:6379`. O compose injeta essas envs automaticamente — nenhuma configuração manual no servidor é necessária além do `.env`.
+
+### Fluxo de autenticação
+
+```
+1. Login  →  backend valida credenciais
+           →  gera access_token (JWT 15min) + refresh_token (JWT 30d)
+           →  seta cookies httpOnly: access_token, refresh_token
+
+2. Request →  Next.js Edge Middleware verifica presença de access_token
+           →  se ausente: redirect para /login?from=<path>
+           →  se presente: serve a página (validação de assinatura é feita pelo backend)
+
+3. API call →  backend lê cookie access_token
+            →  verifica assinatura JWT com JWT_SECRET
+            →  se expirado: frontend chama POST /api/auth/refresh
+                          →  backend verifica refresh_token
+                          →  emite novo access_token
+
+4. Logout  →  backend limpa ambos os cookies
+```
+
+### Fluxo de upload
+
+```
+1. Frontend faz POST /api/files com multipart/form-data
+2. Multer recebe o buffer em memória
+3. Backend faz upload para Firebase Storage
+4. Backend cria registro no PostgreSQL (prisma.file.create)
+   → Se o Prisma falhar: backend deleta o arquivo do Firebase (cleanup atômico)
+   → Audit log registra a ação
+5. Frontend recebe metadados do arquivo criado
 ```
 
 ---
@@ -108,54 +152,43 @@ Aplicação fullstack de armazenamento de arquivos em nuvem, inspirada no Google
 Projeto-driver/
 ├── backend/
 │   ├── src/
-│   │   ├── index.ts               # Entry point
+│   │   ├── index.ts               # Entry point — validateEnv() antes de tudo
 │   │   ├── app.ts                 # Express app + registro de rotas
-│   │   ├── controllers/
-│   │   │   ├── authController.ts  # Registro, login, Google, reset de senha
-│   │   │   ├── fileController.ts  # Upload, download, preview, CRUD de arquivos
-│   │   │   ├── folderController.ts# CRUD de pastas com hierarquia
-│   │   │   └── familyController.ts# Famílias, convites, membros
-│   │   ├── routes/
-│   │   │   ├── authRoutes.ts
-│   │   │   ├── fileRoutes.ts
-│   │   │   ├── folderRoutes.ts
-│   │   │   └── familyRoutes.ts
+│   │   ├── controllers/           # authController, fileController, folderController,
+│   │   │                          # familyController, favoriteFolderController, adminController
+│   │   ├── routes/                # authRoutes, fileRoutes, folderRoutes, familyRoutes, adminRoutes
 │   │   ├── middleware/
-│   │   │   ├── auth.ts            # Verificação do JWT
-│   │   │   ├── validate.ts        # Middleware de validação Zod
-│   │   │   └── rateLimit.ts       # Rate limiting por rota
+│   │   │   ├── auth.ts            # Verificação do JWT (Bearer ou cookie)
+│   │   │   ├── adminAuth.ts       # Verificação de ADMIN_EMAILS
+│   │   │   ├── validate.ts        # Middleware Zod
+│   │   │   └── rateLimit.ts       # Limitadores por rota
 │   │   ├── lib/
 │   │   │   ├── prisma.ts          # Singleton do Prisma Client
 │   │   │   ├── firebase.ts        # Firebase Admin (Storage)
-│   │   │   ├── redis.ts           # Redis client + cache de preview
-│   │   │   ├── multer.ts          # Config de upload (tamanho, MIME)
-│   │   │   ├── emailQueue.ts      # Publicação de jobs BullMQ
-│   │   │   ├── auditLog.ts        # Registro de audit logs
+│   │   │   ├── redis.ts           # Redis cache client (ioredis)
+│   │   │   ├── multer.ts          # Config de upload (tamanho, MIME, fileUploader)
+│   │   │   ├── emailQueue.ts      # Publicação de jobs BullMQ (ioredis)
+│   │   │   ├── auditLog.ts        # Registro de audit logs (falha graciosamente)
 │   │   │   └── familyAccess.ts    # Checagem de permissão familiar
-│   │   ├── utils/
-│   │   │   ├── jwt.ts             # Geração e verificação de JWT
-│   │   │   └── password.ts        # Hashing e comparação de senha
-│   │   └── validation/
-│   │       ├── authSchemas.ts
-│   │       ├── fileSchemas.ts
-│   │       ├── folderSchemas.ts
-│   │       └── familySchemas.ts
+│   │   └── utils/
+│   │       ├── jwt.ts             # Geração e verificação de JWT (requireEnv pattern)
+│   │       ├── validateEnv.ts     # Validação de 7 vars críticas na startup
+│   │       └── parsePositiveInt.ts# Utilitário compartilhado para ler envs numéricas
 │   └── prisma/
-│       └── schema.prisma          # Modelos do banco de dados
+│       └── schema.prisma          # 8 modelos: User, Folder, File, Family,
+│                                  # FamilyMember, AuditLog, PasswordResetToken, FavoriteFolder
 │
 └── frontend/
     └── src/
+        ├── middleware.ts          # Edge Middleware — protege /dashboard/*
         ├── app/
-        │   ├── dashboard/         # Área autenticada
-        │   │   ├── page.tsx       # Browser de arquivos
-        │   │   ├── profile/       # Perfil do usuário
-        │   │   └── family/        # Gestão de família
-        │   ├── login/             # Tela de login
+        │   ├── dashboard/         # Browser de arquivos (page, layout, profile, family)
+        │   ├── login/             # Formulário de login + Google OAuth
         │   ├── register/          # Cadastro
-        │   ├── forgot-password/   # Solicitar reset de senha
-        │   └── reset-password/    # Definir nova senha
+        │   ├── forgot-password/   # Solicitar reset
+        │   └── reset-password/    # Definir nova senha (requer token na URL)
         ├── contexts/              # AuthContext, ThemeContext, UploadContext
-        ├── components/            # Componentes UI reutilizáveis
+        ├── components/            # Componentes UI reutilizáveis (shadcn/ui base)
         ├── features/
         │   ├── files/             # FileBrowser, FileGrid, UploadZone, hooks
         │   └── family/            # Componentes e hooks de família
@@ -169,31 +202,16 @@ Projeto-driver/
 
 ### Modelos
 
-**User** — usuário da plataforma
-- Suporta login por e-mail/senha e Google OAuth (campos separados)
-- Relacionado a arquivos, pastas, famílias e logs de auditoria
-
-**Folder** — pasta do sistema de arquivos
-- Hierarquia via `parentId` (auto-relacionamento)
-- Pode pertencer a um usuário ou a uma família
-
-**File** — arquivo armazenado
-- Referencia o caminho no Firebase Storage
-- Armazena `mimeType`, `size`, e referência à pasta e família
-
-**Family** — espaço colaborativo
-- Cada usuário pode ser dono de exatamente uma família (`ownerId` único)
-- Contém membros via `FamilyMember`
-
-**FamilyMember** — convite/membro de família
-- Status: `pending` | `accepted` | `declined`
-- Restrições únicas: um e-mail por família, um usuário por família
-
-**AuditLog** — registro de ações
-- Armazena ação, recurso, usuário, IP, user agent e metadados JSON
-
-**PasswordResetToken** — token de redefinição de senha
-- Hash SHA-256 do token, TTL de 30 minutos, marcado como usado após conclusão
+| Modelo | Descrição |
+|---|---|
+| `User` | Usuário da plataforma — suporta e-mail/senha e Google OAuth |
+| `Folder` | Pasta — hierarquia via `parentId`, pode pertencer a usuário ou família |
+| `File` | Arquivo — caminho no Firebase, mimeType, size, referência a pasta/família |
+| `Family` | Espaço colaborativo — `ownerId` único (um dono por família) |
+| `FamilyMember` | Convite/membro — status: `pending` / `accepted` / `declined` |
+| `AuditLog` | Registro de ações — ação, recurso, usuário, IP, user agent, metadados JSON |
+| `PasswordResetToken` | Token SHA-256 com TTL de 30 min, marcado como usado após conclusão |
+| `FavoriteFolder` | Relação usuário ↔ pasta favorita |
 
 ---
 
@@ -204,24 +222,26 @@ Projeto-driver/
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | `POST` | `/api/auth/register` | Pública | Criar conta |
-| `POST` | `/api/auth/login` | Pública | Login com e-mail e senha |
-| `POST` | `/api/auth/google` | Pública | Login com Google (Firebase ID token) |
-| `POST` | `/api/auth/forgot-password` | Pública | Solicitar link de reset de senha |
+| `POST` | `/api/auth/login` | Pública | Login e-mail/senha → seta cookies |
+| `POST` | `/api/auth/google` | Pública | Login Google (Firebase ID token) → seta cookies |
+| `POST` | `/api/auth/forgot-password` | Pública | Solicitar link de reset (5 req/15min) |
 | `POST` | `/api/auth/reset-password` | Pública | Redefinir senha com token |
+| `POST` | `/api/auth/refresh` | Pública | Renovar access_token via refresh_token |
 | `GET` | `/api/auth/me` | JWT | Dados do usuário autenticado |
 | `PATCH` | `/api/auth/me` | JWT | Atualizar perfil |
+| `POST` | `/api/auth/logout` | JWT | Limpar cookies |
 
 ### Arquivos
 
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | `GET` | `/api/files` | JWT | Listar arquivos (suporta busca e filtro por pasta) |
-| `POST` | `/api/files` | JWT | Upload de um ou mais arquivos |
+| `POST` | `/api/files` | JWT | Upload de um ou mais arquivos (multipart) |
 | `GET` | `/api/files/:id` | JWT | Metadados de um arquivo |
-| `GET` | `/api/files/:id/download` | JWT | Download do arquivo |
-| `GET` | `/api/files/:id/preview` | JWT | Preview com cache Redis |
+| `GET` | `/api/files/:id/download` | JWT | Download com Content-Disposition RFC 5987 |
+| `GET` | `/api/files/:id/preview` | JWT | Preview com cache Redis (imagens, PDFs, texto) |
 | `PATCH` | `/api/files/:id` | JWT | Renomear ou mover arquivo |
-| `DELETE` | `/api/files/:id` | JWT | Excluir arquivo |
+| `DELETE` | `/api/files/:id` | JWT | Excluir arquivo (Firebase + banco atomicamente) |
 
 ### Pastas
 
@@ -229,6 +249,8 @@ Projeto-driver/
 |---|---|---|---|
 | `GET` | `/api/folders` | JWT | Listar pastas (suporta `parentId`) |
 | `POST` | `/api/folders` | JWT | Criar pasta |
+| `GET` | `/api/folders/favorites` | JWT | Pastas favoritas do usuário |
+| `POST` | `/api/folders/:id/favorite` | JWT | Alternar favorito |
 | `GET` | `/api/folders/:id` | JWT | Pasta com filhos |
 | `PATCH` | `/api/folders/:id` | JWT | Renomear ou mover (com anti-ciclo) |
 | `DELETE` | `/api/folders/:id` | JWT | Excluir com cascata |
@@ -242,10 +264,23 @@ Projeto-driver/
 | `PATCH` | `/api/families/:familyId` | JWT | Atualizar nome |
 | `DELETE` | `/api/families/:familyId` | JWT | Excluir família |
 | `POST` | `/api/families/:familyId/invites` | JWT | Convidar membro por e-mail |
-| `GET` | `/api/families/invitations` | JWT | Convites recebidos |
+| `GET` | `/api/families/invitations` | JWT | Convites recebidos pelo usuário |
 | `PATCH` | `/api/families/invitations/:id` | JWT | Aceitar ou recusar convite |
 | `GET` | `/api/families/:familyId/members` | JWT | Listar membros |
 | `DELETE` | `/api/families/:familyId/members/:userId` | JWT | Remover membro |
+
+### Admin
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/api/admin/send-email` | JWT + admin | Enviar e-mail manualmente |
+
+### Outros
+
+| Rota | Descrição |
+|---|---|
+| `GET /health` | Health check (banco + redis) |
+| `GET /api-docs` | Documentação Scalar (Basic Auth: `DOCS_USER` / `DOCS_PASSWORD`) |
 
 ---
 
@@ -253,53 +288,34 @@ Projeto-driver/
 
 ### Pré-requisitos
 
-- Node.js 20+
+- Node.js 22+
 - PostgreSQL
-- Redis
-- Conta no Firebase (Storage + Auth)
-- Docker (opcional, para PostgreSQL e Redis)
+- Redis (duas instâncias, ou uma compartilhada em dev)
+- Conta no Firebase (Storage + Auth habilitados)
+- Docker (opcional)
 
-### 1. Clonar e instalar dependências
+### 1. Instalar dependências
 
 ```bash
-git clone https://github.com/seu-usuario/projeto-driver.git
-cd projeto-driver
-
 cd backend && npm install
 cd ../frontend && npm install
 ```
 
 ### 2. Configurar variáveis de ambiente
 
-**Backend** — copie e preencha `backend/.env`:
+Copie `backend/.env.example` para `backend/.env` e preencha todas as variáveis. As obrigatórias são:
 
 ```env
-PORT=3000
-FRONTEND_URL=http://localhost:3001
-DATABASE_URL="postgresql://usuario:senha@localhost:5432/drive_db?schema=public"
-JWT_SECRET=chave-secreta-longa-e-aleatoria
-
-# Redis (cache de preview + fila de emails)
-REDIS_URL=redis://localhost:6379
-REDIS_CONNECT_TIMEOUT_MS=300
-FILE_PREVIEW_CACHE_TTL_SECONDS=3600
-FILE_PREVIEW_CACHE_MAX_BYTES=20971520   # 20 MB por arquivo em cache
-FILE_PREVIEW_MAX_BYTES=52428800         # 50 MB tamanho máximo para preview
-
-# Reset de senha
-PASSWORD_RESET_TOKEN_TTL_MINUTES=30
-```
-
-**Firebase** — adicione ao `.env` do backend as credenciais do Firebase Admin SDK:
-
-```env
-FIREBASE_PROJECT_ID=seu-project-id
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk@...iam.gserviceaccount.com
+DATABASE_URL=postgresql://usuario:senha@localhost:5432/drive_db
+JWT_SECRET=<string longa e aleatória>
+REFRESH_JWT_SECRET=<string diferente da anterior>
+FIREBASE_PROJECT_ID=...
+FIREBASE_CLIENT_EMAIL=...
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
-FIREBASE_STORAGE_BUCKET=seu-projeto.appspot.com
+FIREBASE_STORAGE_BUCKET=...
 ```
 
-**Frontend** — copie e preencha `frontend/.env.local`:
+Para o frontend, crie `frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3000
@@ -309,6 +325,13 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
+```
+
+Em desenvolvimento local, `REDIS_URL` e `REDIS_CACHE_URL` podem apontar para a mesma instância Redis:
+
+```env
+REDIS_URL=redis://localhost:6379
+REDIS_CACHE_URL=redis://localhost:6379
 ```
 
 ### 3. Banco de dados
@@ -321,109 +344,113 @@ npx prisma migrate dev
 ### 4. Iniciar os serviços
 
 ```bash
-# Terminal 1 — backend
+# Terminal 1 — backend (porta 3000)
 cd backend && npm run dev
 
-# Terminal 2 — frontend
+# Terminal 2 — frontend (porta 3001)
 cd frontend && npm run dev
-
-# Terminal 3 — email-worker (opcional, para envio de e-mails)
-cd ../email-worker && npm run dev
 ```
 
-Frontend: [http://localhost:3001](http://localhost:3001)
-Backend: [http://localhost:3000](http://localhost:3000)
-
----
-
-## Serviço de E-mail (email-worker)
-
-O envio de e-mails é feito por um serviço separado (`email-worker`) que consome a fila BullMQ publicada pelo backend. Isso mantém o backend sem bloqueio e permite retry automático em caso de falha.
-
-Repositório do worker: [repositorio (click)](https://github.com/SamuelFontess/servico-mensageria)
-
-### Como funciona
-
-```
-Backend
-  └── publishEmailJob('family_invite' | 'forgot_password', payload)
-           │
-           ▼ BullMQ (Redis — fila "email")
-email-worker
-  ├── Consome o job
-  ├── Renderiza template HTML (family-invite.html / forgot-password.html)
-  ├── Envia via Gmail SMTP ou Resend
-  └── Emite evento email:status via WebSocket
-```
-
-### Variáveis necessárias no email-worker
-
-```env
-REDIS_URL=redis://localhost:6379
-ADMIN_API_KEY=chave-gerada-com-openssl
-FRONTEND_URL=http://localhost:3001
-
-# Gmail SMTP (gratuito, sem domínio)
-EMAIL_PROVIDER=smtp
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=seuapp@gmail.com
-SMTP_PASS=senha-de-app-16-caracteres
-SMTP_FROM=seuapp@gmail.com
-```
-
-Veja o [README do email-worker](https://github.com/SamuelFontess/servico-mensageria)
-
----
-
-## Deploy no Railway
-
-O projeto está configurado para deploy no Railway com 4 serviços no mesmo projeto:
-
-| Serviço | Descrição |
-|---|---|
-| **Backend** | API Express — porta 3000 (ou `$PORT` do Railway) |
-| **Frontend** | Next.js — porta 3001 |
-| **PostgreSQL** | Banco de dados gerenciado pelo Railway |
-| **Redis** | Cache + fila de e-mails |
-| **email-worker** | Worker separado consumindo a fila Redis |
-
-Para conectar o backend ao Redis e PostgreSQL do Railway, use referências de variáveis:
-
-```
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
-```
-
----
-
-## Testes
+### 5. Testes
 
 ```bash
-# Backend
+# Backend — 19 testes de integração
 cd backend && npm test
 
-# Frontend
+# Frontend — unit tests
 cd frontend && npm test
-```
 
-Os testes usam **Vitest**. O backend inclui testes de integração de rotas com `supertest`.
+# E2E — Playwright (requer o frontend rodando)
+cd frontend && npm run test:e2e
+```
 
 ---
 
-## Decisões de Arquitetura
+## Deploy com Docker Compose
 
-### Por que Firebase Storage?
-Elimina a necessidade de gerenciar servidor de arquivos. Os uploads vão direto do backend para o Firebase, e os downloads são servidos via URLs assinadas — sem tráfego extra pelo servidor.
+O projeto inclui `docker-compose.yml` (dev/staging) e `docker-compose.prod.yml` (produção).
 
-### Por que Redis para preview?
-Arquivos de preview (imagens, PDFs pequenos) são gerados sob demanda e cacheados no Redis com TTL configurável. Isso evita bater no Firebase Storage a cada visualização.
+### Serviços no compose
 
-### Por que BullMQ ao invés de chamar o provedor de e-mail diretamente?
-O envio de e-mail pode falhar por instabilidade do provedor. Com BullMQ, o backend simplesmente publica o job e retorna ao cliente imediatamente. O worker cuida dos retries (3 tentativas, backoff exponencial) sem impacto na latência do endpoint.
+| Serviço | Imagem | Porta exposta | Descrição |
+|---|---|---|---|
+| `postgres` | postgres:16-alpine | interno | Banco de dados |
+| `redis` | redis:7-alpine | interno | BullMQ — `noeviction` |
+| `redis-cache` | redis:7-alpine | interno | Preview cache — `allkeys-lru` |
+| `migrations` | backend Dockerfile | — | Roda `prisma migrate deploy` antes do backend |
+| `backend` | backend Dockerfile | 8080 | API Express |
+| `frontend` | frontend Dockerfile | 3000 | Next.js |
+| `email-worker` | email-worker Dockerfile | interno | Consome fila BullMQ |
 
-### Por que um serviço de e-mail separado?
-Isola a responsabilidade de envio de e-mail do backend principal. Se o worker cair, o backend continua funcionando. Os jobs ficam na fila do Redis até o worker voltar.
+### Variáveis obrigatórias no .env do servidor
 
-### Por que Redis é opcional no backend?
-O cache de preview degrada graciosamente: se o Redis não estiver disponível, o sistema busca o arquivo no Firebase a cada request. Nenhuma funcionalidade crítica depende do Redis no backend — apenas performance.
+```env
+POSTGRES_PASSWORD=...
+JWT_SECRET=...
+REFRESH_JWT_SECRET=...
+FRONTEND_URL=https://seudominio.com
+BREVO_API_KEY=...
+BREVO_FROM=noreply@seudominio.com
+DOCS_PASSWORD=...
+COOKIE_SECURE=true
+EMAIL_WORKER_ADMIN_API_KEY=...
+```
+
+O Firebase é configurado via `backend/serviceAccountKey.json` montado no container (ver `docker-compose.yml`).
+
+### nginx no host
+
+O backend expõe a porta 8080 e o frontend a 3000. O nginx no host faz a terminação HTTPS e repassa as requisições:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name seudominio.com;
+
+    location /api/ {
+        proxy_pass http://localhost:8080;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+    }
+}
+```
+
+O `trust proxy 1` no Express garante que o rate limiting use o IP real do cliente (via `X-Forwarded-For`).
+
+---
+
+## CI/CD
+
+### GitHub Actions (`.github/workflows/`)
+
+| Workflow | Trigger | O que faz |
+|---|---|---|
+| `ci.yml` | push/PR em `main` | TypeScript, testes backend, testes frontend, Playwright E2E |
+| `deploy.yml` | CI completa com sucesso | Build e push das imagens para GHCR, atualização via Watchtower |
+
+O deploy só roda após o CI completar com sucesso (`workflow_run` + `conclusion == 'success'`). Watchtower (`5 min polling`) detecta as novas imagens e reinicia os containers automaticamente.
+
+---
+
+## Decisões de arquitetura
+
+### Cookies httpOnly em vez de localStorage
+Tokens em localStorage são acessíveis por qualquer JavaScript na página (XSS). Cookies httpOnly não são — o browser os envia automaticamente e scripts não podem lê-los.
+
+### validateEnv() na startup
+`backend/src/utils/validateEnv.ts` verifica 7 variáveis críticas antes de qualquer módulo ser carregado. Se alguma estiver ausente, o processo termina com mensagem clara em vez de falhar silenciosamente durante uma operação.
+
+### Dois Redis
+BullMQ precisa de `noeviction` — um job perdido é um e-mail nunca enviado. Cache de preview pode ser eviccionado livremente sem impacto funcional. Misturar os dois no mesmo Redis com `allkeys-lru` arriscaria apagar jobs de fila sob pressão de memória.
+
+### Upload atômico
+Se o `prisma.file.create()` falhar após o upload para o Firebase, o backend deleta o arquivo do Storage. Sem isso, arquivos órfãos acumulam no Firebase sem nenhum registro no banco.
+
+### RFC 5987 no Content-Disposition
+O header `filename=` padrão só suporta ASCII. RFC 5987 adiciona `filename*=UTF-8''nome%20com%20acentos`, garantindo que nomes com caracteres especiais sejam recebidos corretamente por todos os browsers.
