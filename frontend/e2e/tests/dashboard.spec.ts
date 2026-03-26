@@ -215,31 +215,39 @@ test.describe("File Browser — navegação de pastas", () => {
   test("clicar em uma pasta atualiza a URL com folderId", async ({
     authenticatedPage: page,
   }) => {
-    await page.route("**/api/folders**", (route) =>
-      route.fulfill({
-        status: 200,
-        body: JSON.stringify({
-          folders: [
-            {
-              id: "folder-nav-1",
-              name: "Projetos",
-              parentId: null,
-              updatedAt: new Date().toISOString(),
-            },
-          ],
-          total: 1,
-          page: 1,
-          limit: 50,
-          totalPages: 1,
-        }),
-      }),
-    );
+    await page.route("**/api/folders**", (route) => {
+      const url = route.request().url();
+      // GET /api/folders/:id — chamado pelo BreadcrumbNav após navegação
+      if (/\/api\/folders\/folder-nav-1/.test(url)) {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            folder: { id: "folder-nav-1", name: "Projetos", parentId: null, updatedAt: new Date().toISOString() },
+          }),
+        });
+      } else {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            folders: [
+              { id: "folder-nav-1", name: "Projetos", parentId: null, updatedAt: new Date().toISOString() },
+            ],
+            total: 1,
+            page: 1,
+            limit: 50,
+            totalPages: 1,
+          }),
+        });
+      }
+    });
 
     await page.goto("/dashboard");
 
-    await page.getByText("Projetos").click();
+    // FolderCard é um div com role="button" e aria-label="Abrir pasta {nome}".
+    await page.getByRole("button", { name: /Abrir pasta Projetos/ }).click();
 
-    await expect(page).toHaveURL(/folderId=folder-nav-1/, { timeout: 8000 });
+    await expect(page).toHaveURL(/folder=folder-nav-1/, { timeout: 8000 });
   });
 
   test("breadcrumb exibe o nome da pasta ao navegar para dentro", async ({
@@ -247,12 +255,23 @@ test.describe("File Browser — navegação de pastas", () => {
   }) => {
     await page.route("**/api/folders**", (route) => {
       const url = route.request().url();
-      if (url.includes("parentId=folder-nav-2") || url.includes("folderId=folder-nav-2")) {
+      // GET /api/folders/:id — usado pelo BreadcrumbNav para buscar o nome da pasta
+      if (/\/api\/folders\/folder-nav-2/.test(url)) {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            folder: { id: "folder-nav-2", name: "Documentos Legais", parentId: null, updatedAt: new Date().toISOString() },
+          }),
+        });
+      } else if (url.includes("parentId=folder-nav-2")) {
+        // listagem de subpastas dentro de folder-nav-2
         route.fulfill({
           status: 200,
           body: JSON.stringify({ folders: [], total: 0, page: 1, limit: 50, totalPages: 0 }),
         });
       } else {
+        // listagem raiz
         route.fulfill({
           status: 200,
           body: JSON.stringify({
@@ -274,11 +293,11 @@ test.describe("File Browser — navegação de pastas", () => {
     });
 
     await page.goto("/dashboard");
-    await page.getByText("Documentos Legais").click();
+    await page.getByRole("button", { name: /Abrir pasta Documentos Legais/ }).click();
 
     await expect(
       page
-        .getByRole("navigation", { name: "Localização atual" })
+        .getByRole("navigation", { name: "Navegação por pastas" })
         .getByText("Documentos Legais"),
     ).toBeVisible({ timeout: 8000 });
   });

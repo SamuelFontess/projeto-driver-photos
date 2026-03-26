@@ -72,13 +72,22 @@ test.describe("Login", () => {
   test("redireciona para /dashboard após login bem-sucedido", async ({
     page,
   }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
+    // Registra rotas ANTES do goto para evitar race condition com React Strict Mode
+    // (double-invoke de effects em dev): se auth/me → 200 fosse registrado após goto,
+    // o segundo efeito poderia buscar o usuário e PublicOnlyRoute redirecionaria antes
+    // de fillAndSubmit rodar.
+    let loginDone = false;
 
-    // addCookies() em vez de Set-Cookie header: o Set-Cookie via route.fulfill() seta o
-    // cookie no domínio da API (localhost:8080), não no domínio do Next.js (localhost:3005)
-    // onde o middleware verifica. addCookies() com domain 'localhost' cobre ambas as portas.
+    await page.route("**/api/auth/me", (route) =>
+      route.fulfill({
+        status: loginDone ? 200 : 401,
+        contentType: "application/json",
+        body: JSON.stringify(loginDone ? { user: MOCK_USER } : { error: "Unauthorized" }),
+      }),
+    );
     await page.route("**/api/auth/login", async (route) => {
+      // addCookies() em vez de Set-Cookie header: Set-Cookie via route.fulfill() seta o
+      // cookie no domínio da API (localhost:8080), não no domínio do Next.js (localhost:3005).
       await page.context().addCookies([{
         name: 'access_token',
         value: MOCK_TOKEN,
@@ -87,19 +96,13 @@ test.describe("Login", () => {
         httpOnly: true,
         sameSite: 'Strict',
       }]);
+      loginDone = true;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ token: MOCK_TOKEN, user: MOCK_USER, message: "ok" }),
       });
     });
-    await page.route("**/api/auth/me", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ user: MOCK_USER }),
-      }),
-    );
     await page.route("**/api/folders**", (route) =>
       route.fulfill({
         status: 200,
@@ -125,6 +128,8 @@ test.describe("Login", () => {
       }),
     );
 
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
     await loginPage.fillAndSubmit("test@driver.com", "senha123");
 
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 8000 });
@@ -173,9 +178,16 @@ test.describe("Registro", () => {
   test("redireciona para /dashboard após registro bem-sucedido", async ({
     page,
   }) => {
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
+    // Mesma estratégia do teste de login: rotas antes do goto para evitar race condition.
+    let registerDone = false;
 
+    await page.route("**/api/auth/me", (route) =>
+      route.fulfill({
+        status: registerDone ? 200 : 401,
+        contentType: "application/json",
+        body: JSON.stringify(registerDone ? { user: MOCK_USER } : { error: "Unauthorized" }),
+      }),
+    );
     await page.route("**/api/auth/register", async (route) => {
       await page.context().addCookies([{
         name: 'access_token',
@@ -185,19 +197,13 @@ test.describe("Registro", () => {
         httpOnly: true,
         sameSite: 'Strict',
       }]);
+      registerDone = true;
       await route.fulfill({
         status: 201,
         contentType: "application/json",
         body: JSON.stringify({ token: MOCK_TOKEN, user: MOCK_USER, message: "ok" }),
       });
     });
-    await page.route("**/api/auth/me", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ user: MOCK_USER }),
-      }),
-    );
     await page.route("**/api/folders**", (route) =>
       route.fulfill({
         status: 200,
@@ -223,6 +229,8 @@ test.describe("Registro", () => {
       }),
     );
 
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
     await registerPage.fillAndSubmit(
       "Test User",
       "test@driver.com",

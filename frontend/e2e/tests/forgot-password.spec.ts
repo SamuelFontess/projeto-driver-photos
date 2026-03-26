@@ -57,14 +57,17 @@ test.describe('Recuperação de senha', () => {
 
     await forgotPage.emailInput.fill('test@driver.com');
 
-    // waitForRequest garante que a request foi iniciada antes de checar o estado do botão,
-    // evitando race condition entre o click e a propagação do isSubmitting=true no React.
-    const requestPromise = page.waitForRequest('**/api/auth/forgot-password');
+    // react-hook-form seta isSubmitting=true sincronamente ao chamar handleSubmit,
+    // antes de qualquer await. Verificamos imediatamente após o click, enquanto o
+    // route handler segura a resposta por 500ms.
     await forgotPage.submitButton.click();
-    await requestPromise;
 
-    await expect(forgotPage.submitButton).toBeDisabled({ timeout: 2000 });
-    await expect(page.getByText('Enviando...')).toBeVisible({ timeout: 2000 });
+    // forgotPage.submitButton usa getByRole('button', { name: 'Enviar instruções' }),
+    // que para de corresponder quando isSubmitting=true muda o texto para "Enviando...".
+    // Usar o seletor por tipo garante que o mesmo elemento é encontrado em ambos os estados.
+    const submitBtn = page.locator('button[type="submit"]');
+    await expect(submitBtn).toBeDisabled({ timeout: 3000 });
+    await expect(page.getByText('Enviando...')).toBeVisible({ timeout: 3000 });
   });
 
   test('exibe toast de erro se a API retornar falha', async ({ page }) => {

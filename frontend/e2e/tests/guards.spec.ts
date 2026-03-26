@@ -39,28 +39,33 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
   }) => {
     const MOCK_USER = { id: '1', email: 'test@driver.com', name: 'Test User' };
 
-    // Tenta acessar rota protegida → vai para /login?from=/dashboard/profile
-    await page.goto('/dashboard/profile');
-    await expect(page).toHaveURL(/\/login/, { timeout: 8000 });
-
-    // Configura mocks para login bem-sucedido
-    await page.route('**/api/auth/login', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        headers: {
-          'Set-Cookie': 'access_token=mock-token; Path=/; HttpOnly; SameSite=Strict',
-        },
-        body: JSON.stringify({ token: 'mock-token', user: MOCK_USER }),
-      }),
-    );
+    // Registra rotas ANTES do goto — mesma estratégia de auth.spec.ts para evitar
+    // race condition: auth/me → 200 registrado após goto é captado pelo segundo
+    // efeito do React Strict Mode, fazendo PublicOnlyRoute redirecionar antes do fill.
+    let loginDone = false;
     await page.route('**/api/auth/me', (route) =>
       route.fulfill({
-        status: 200,
+        status: loginDone ? 200 : 401,
         contentType: 'application/json',
-        body: JSON.stringify({ user: MOCK_USER }),
+        body: JSON.stringify(loginDone ? { user: MOCK_USER } : { error: 'Unauthorized' }),
       }),
     );
+    await page.route('**/api/auth/login', async (route) => {
+      await page.context().addCookies([{
+        name: 'access_token',
+        value: 'mock-token',
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'Strict',
+      }]);
+      loginDone = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ token: 'mock-token', user: MOCK_USER }),
+      });
+    });
     await page.route('**/api/folders**', (route) =>
       route.fulfill({ status: 200, body: JSON.stringify({ folders: [], total: 0, page: 1, limit: 50, totalPages: 0 }) }),
     );
@@ -68,11 +73,13 @@ test.describe('Usuário NÃO autenticado — parâmetro from', () => {
       route.fulfill({ status: 200, body: JSON.stringify({ files: [], total: 0, page: 1, limit: 50, totalPages: 0 }) }),
     );
 
-    // Aguarda o redirect para /login antes de interagir (evita flakiness por timing)
+    // Tenta acessar rota protegida → redireciona para /login?from=/dashboard/profile
+    await page.goto('/dashboard/profile');
     await page.waitForURL(/\/login/, { timeout: 8000 });
+
     await page.getByLabel('Email').fill('test@driver.com');
     await page.getByLabel('Senha').fill('senha123');
-    await page.getByRole('button', { name: 'Entrar' }).click();
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
     // Deve redirecionar para o caminho original (/dashboard/profile) ou para /dashboard
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 8000 });

@@ -110,7 +110,11 @@ test.describe('Página de Família — com família', () => {
 
     await page.goto('/dashboard/family');
 
-    await expect(page.getByText(MOCK_FAMILY.name, { exact: true })).toBeVisible({ timeout: 8000 });
+    // O nome da família aparece no SelectTrigger (combobox) visível no desktop.
+    // Evita o elemento <p class="sm:hidden"> que está oculto no viewport padrão (1280px).
+    await expect(
+      page.getByRole('combobox').filter({ hasText: MOCK_FAMILY.name }),
+    ).toBeVisible({ timeout: 8000 });
   });
 
   test('exibe estado vazio no FileBrowser da família quando não há arquivos', async ({

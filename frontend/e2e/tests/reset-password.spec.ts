@@ -60,7 +60,7 @@ test.describe('Redefinição de senha', () => {
     await page.getByLabel('Confirmar senha').fill('novaSenha123');
     await page.getByRole('button', { name: 'Redefinir senha' }).click();
 
-    await expect(page.getByText('Erro ao redefinir senha')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Erro ao redefinir senha', { exact: true })).toBeVisible({ timeout: 8000 });
   });
 
   test('exibe erro de validação quando as senhas não coincidem', async ({ page }) => {
