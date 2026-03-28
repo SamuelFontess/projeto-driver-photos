@@ -172,8 +172,7 @@ services:
 
 networks:
   driver_net:
-    driver: bridge
-    name: driver_net
+    external: true
 
 volumes:
   postgres_data:
