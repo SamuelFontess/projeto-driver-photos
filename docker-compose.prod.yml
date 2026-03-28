@@ -172,7 +172,8 @@ services:
 
 networks:
   driver_net:
-    external: true
+    driver: bridge
+    name: driver_net  # nome explícito para que o email-worker possa referenciar como external: true
 
 volumes:
   postgres_data:
