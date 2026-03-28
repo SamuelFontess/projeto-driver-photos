@@ -79,6 +79,8 @@ services:
     image: ghcr.io/samuelfontess/projeto-driver-backend:latest
     container_name: driver_backend
     restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     environment:
       NODE_ENV: production
       PORT: 8080
@@ -125,32 +127,13 @@ services:
       migrations:
         condition: service_completed_successfully
 
-  # ─── Email Worker ───────────────────────────────────────────────────────────
-  email-worker:
-    image: ghcr.io/samuelfontess/email-worker:latest
-    container_name: driver_email_worker
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: 3002
-      REDIS_URL: redis://redis:6379
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-brevo}
-      BREVO_API_KEY: ${BREVO_API_KEY}
-      BREVO_FROM: ${BREVO_FROM}
-      BREVO_FROM_NAME: ${BREVO_FROM_NAME:-Driver App}
-      FRONTEND_URL: ${FRONTEND_URL}
-      ADMIN_API_KEY: ${EMAIL_WORKER_ADMIN_API_KEY}
-    networks:
-      - driver_net
-    depends_on:
-      redis:
-        condition: service_healthy
-
   # ─── Frontend ───────────────────────────────────────────────────────────────
   frontend:
     image: ghcr.io/samuelfontess/projeto-driver-frontend:latest
     container_name: driver_frontend
     restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     ports:
       - "3000:3000"
     networks:
@@ -179,6 +162,7 @@ services:
     environment:
       WATCHTOWER_POLL_INTERVAL: 300
       WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
       REPO_USER: samuelfontess
       REPO_PASS: ${GITHUB_TOKEN}
     volumes:
@@ -189,6 +173,7 @@ services:
 networks:
   driver_net:
     driver: bridge
+    name: driver_net  # nome explícito para que o email-worker possa referenciar como external: true
 
 volumes:
   postgres_data:
