@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { sendEmail } from '../lib/emailSender';
+import { publishEmailJob } from '../lib/emailQueue';
 import { createAuditLog } from '../lib/auditLog';
 import { logger } from '../lib/logger';
 
@@ -7,7 +7,7 @@ export async function sendManualEmail(req: Request, res: Response): Promise<void
   try {
     const { to, subject, body } = req.body as { to: string; subject: string; body: string };
 
-    await sendEmail({ to, subject, html: body });
+    await publishEmailJob('manual_email', { to, subject, html: body });
 
     await createAuditLog({
       req,
