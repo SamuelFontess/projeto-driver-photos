@@ -395,6 +395,93 @@ describe("Routes integration", () => {
 
       expect(response.status).toBe(403);
     });
+
+    it("POST /api/families/:id/members usa email do inviter quando nome está vazio (usuário sem conta)", async () => {
+      const invite = {
+        id: "member-1",
+        familyId: "family-1",
+        userId: null,
+        email: "invited@test.com",
+        status: "pending",
+        invitedById: "user-1",
+        invitedAt: new Date(),
+        acceptedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      prismaMock.family.findUnique.mockResolvedValue({
+        id: "family-1",
+        name: "Test Family",
+        ownerId: "user-1",
+      });
+      // 1ª chamada: invitedUser por email → null (sem conta)
+      prismaMock.user.findUnique.mockResolvedValueOnce(null);
+      // familyMember.findFirst: sem convite anterior
+      prismaMock.familyMember.findFirst.mockResolvedValue(null);
+      // 2ª chamada: inviter por id → name null, só email
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        name: null,
+        email: "inviter@test.com",
+      });
+      prismaMock.familyMember.create.mockResolvedValue(invite);
+
+      const response = await request(app)
+        .post("/api/families/family-1/invites")
+        .set("Cookie", authCookie("user-1", "inviter@test.com"))
+        .send({ email: "invited@test.com" });
+
+      expect(response.status).toBe(201);
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledWith(
+        "family_invite_register",
+        expect.objectContaining({ inviterName: "inviter@test.com" }),
+      );
+    });
+
+    it("POST /api/families/:id/members usa email do inviter quando nome está vazio (usuário com conta)", async () => {
+      const invite = {
+        id: "member-2",
+        familyId: "family-1",
+        userId: "invited-user-2",
+        email: "invited@test.com",
+        status: "pending",
+        invitedById: "user-1",
+        invitedAt: new Date(),
+        acceptedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      prismaMock.family.findUnique.mockResolvedValue({
+        id: "family-1",
+        name: "Test Family",
+        ownerId: "user-1",
+      });
+      // 1ª chamada: invitedUser por email → usuário com conta
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        id: "invited-user-2",
+        email: "invited@test.com",
+      });
+      // familyMember.findFirst: sem convite anterior
+      prismaMock.familyMember.findFirst.mockResolvedValue(null);
+      // 2ª chamada: inviter por id → name null, só email
+      prismaMock.user.findUnique.mockResolvedValueOnce({
+        name: null,
+        email: "inviter@test.com",
+      });
+      prismaMock.familyMember.create.mockResolvedValue(invite);
+
+      const response = await request(app)
+        .post("/api/families/family-1/invites")
+        .set("Cookie", authCookie("user-1", "inviter@test.com"))
+        .send({ email: "invited@test.com" });
+
+      expect(response.status).toBe(201);
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledWith(
+        "family_invite",
+        expect.objectContaining({ inviterName: "inviter@test.com" }),
+      );
+    });
   });
 
   // ─── Admin ─────────────────────────────────────────────────────────────────
