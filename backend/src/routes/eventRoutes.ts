@@ -23,7 +23,7 @@ router.get('/', authenticate, (req, res) => {
 
   req.on('close', () => {
     clearInterval(keepalive);
-    sseManager.remove(userId);
+    sseManager.remove(userId, res);
   });
 });
 
