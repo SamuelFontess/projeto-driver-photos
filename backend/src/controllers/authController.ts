@@ -92,6 +92,11 @@ export async function register(req: Request, res: Response): Promise<void> {
       },
     });
 
+    await prisma.familyMember.updateMany({
+      where: { email: user.email.toLowerCase(), userId: null, status: 'pending' },
+      data: { userId: user.id },
+    });
+
     await createAuditLog({
       req,
       action: 'auth.register',
