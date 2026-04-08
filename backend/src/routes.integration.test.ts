@@ -1,7 +1,8 @@
 import request from "supertest";
 import type { Express } from "express";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { generateToken } from "./utils/jwt";
+import { publishEmailJob } from "./lib/emailQueue";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const prismaMock = {
@@ -34,6 +35,7 @@ const prismaMock = {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
+    updateMany: vi.fn().mockResolvedValue({ count: 0 }),
   },
   favoriteFolder: {
     findMany: vi.fn(),
@@ -396,6 +398,10 @@ describe("Routes integration", () => {
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
   describe("Admin", () => {
+    afterEach(() => {
+      delete process.env.ADMIN_EMAILS;
+    });
+
     it("POST /api/admin/send-email returns 403 for non-admin", async () => {
       const response = await request(app)
         .post("/api/admin/send-email")
@@ -411,6 +417,38 @@ describe("Routes integration", () => {
         .send({ to: "user@mail.com", subject: "test", body: "<p>hello</p>" });
 
       expect(response.status).toBe(401);
+    });
+
+    it("POST /api/admin/send-email returns 200 and enqueues manual_email job", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+      vi.mocked(publishEmailJob).mockResolvedValue("mock-job-id");
+
+      const response = await request(app)
+        .post("/api/admin/send-email")
+        .set("Cookie", adminCookie())
+        .send({ to: "destino@mail.com", subject: "Assunto", body: "<p>Corpo</p>" });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ message: "Email enviado com sucesso" });
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledOnce();
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledWith("manual_email", {
+        to: "destino@mail.com",
+        subject: "Assunto",
+        html: "<p>Corpo</p>",
+      });
+    });
+
+    it("POST /api/admin/send-email returns 200 even when job returns empty jobId", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+      vi.mocked(publishEmailJob).mockResolvedValue("");
+
+      const response = await request(app)
+        .post("/api/admin/send-email")
+        .set("Cookie", adminCookie())
+        .send({ to: "destino@mail.com", subject: "Assunto", body: "<p>Corpo</p>" });
+
+      expect(response.status).toBe(200);
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledOnce();
     });
   });
 
