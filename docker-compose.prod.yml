@@ -165,7 +165,7 @@ services:
       DOCKER_CONFIG: /config
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/samuel/.docker:/config:ro
+      - ${DOCKER_CONFIG_PATH}:/config:ro
     networks:
       - driver_net
 
