@@ -162,10 +162,10 @@ services:
       WATCHTOWER_POLL_INTERVAL: 300
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_LABEL_ENABLE: "true"
-      REPO_USER: samuelfontess
-      REPO_PASS: ${GITHUB_TOKEN}
+      DOCKER_CONFIG: /config
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker:/config:ro
     networks:
       - driver_net
 
