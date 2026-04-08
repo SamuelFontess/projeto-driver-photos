@@ -51,7 +51,8 @@ const PASSWORD_RESET_TOKEN_TTL_MINUTES = parsePositiveInt(
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password, name } = req.body;
+    const { email: rawEmail, password, name } = req.body;
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : rawEmail;
 
     // Validação básica
     if (!email || !password) {
@@ -93,7 +94,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     });
 
     await prisma.familyMember.updateMany({
-      where: { email: user.email.toLowerCase(), userId: null, status: 'pending' },
+      where: { email: user.email, userId: null, status: 'pending' },
       data: { userId: user.id },
     });
 
