@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -11,10 +12,12 @@ import Link from 'next/link';
 import { useToast } from '@/src/hooks/use-toast';
 import { Loader2, HardDrive } from 'lucide-react';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const { register: registerUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const prefilledEmail = searchParams.get('email') ?? '';
 
   const {
     register,
@@ -22,6 +25,7 @@ export default function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    defaultValues: { email: prefilledEmail },
   });
 
   const onSubmit = async (data: RegisterFormData) => {
@@ -123,5 +127,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </PublicOnlyRoute>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }
