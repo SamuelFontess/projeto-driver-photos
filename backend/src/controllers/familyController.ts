@@ -271,7 +271,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         familyName: family.name,
         invitedById,
         invitedEmail: normalizedEmail,
-        inviterName: inviter?.name ?? 'Alguém',
+        inviterName: inviter?.name || inviter?.email || 'Alguém',
         inviterEmail: inviter?.email ?? '',
       };
 
@@ -369,7 +369,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         invitedById,
         invitedUserId: invitedUser.id,
         invitedEmail: normalizedEmail,
-        inviterName: inviter?.name ?? 'Alguém',
+        inviterName: inviter?.name || inviter?.email || 'Alguém',
         inviterEmail: inviter?.email ?? '',
       });
 
@@ -407,7 +407,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
       invitedById,
       invitedUserId: invitedUser.id,
       invitedEmail: normalizedEmail,
-      inviterName: inviter?.name ?? 'Alguém',
+      inviterName: inviter?.name || inviter?.email || 'Alguém',
       inviterEmail: inviter?.email ?? '',
     });
 
