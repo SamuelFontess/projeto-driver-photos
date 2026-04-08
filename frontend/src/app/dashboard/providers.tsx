@@ -1,10 +1,19 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useCallback } from 'react';
 import { SidebarProvider } from '@/src/contexts/SidebarContext';
 import { ProtectedRoute } from '@/src/components/auth/ProtectedRoute';
 import { Sidebar } from '@/src/components/layout/sidebar';
 import { Loader2 } from 'lucide-react';
+import { useEmailStatusSse, type EmailStatusEvent } from '@/src/hooks/use-email-status-sse';
+import { useToast } from '@/src/hooks/use-toast';
+
+const EMAIL_STATUS_LABELS: Record<EmailStatusEvent['type'], string> = {
+  family_invite: 'Convite de família',
+  family_invite_register: 'Convite de família',
+  forgot_password: 'Redefinição de senha',
+  manual_email: 'E-mail enviado',
+};
 
 function DashboardLayoutFallback() {
   return (
@@ -17,11 +26,36 @@ function DashboardLayoutFallback() {
   );
 }
 
+function EmailStatusListener() {
+  const { toast } = useToast();
+
+  const handleEmailStatus = useCallback((event: EmailStatusEvent) => {
+    const title = EMAIL_STATUS_LABELS[event.type] ?? 'E-mail';
+    if (event.status === 'sent') {
+      toast({
+        title,
+        description: event.email ? `E-mail enviado para ${event.email}.` : 'E-mail enviado com sucesso.',
+      });
+    } else {
+      toast({
+        title,
+        description: event.error ?? 'Falha ao enviar o e-mail.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+
+  useEmailStatusSse(handleEmailStatus);
+
+  return null;
+}
+
 export function DashboardProviders({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <Suspense fallback={<DashboardLayoutFallback />}>
         <ProtectedRoute>
+          <EmailStatusListener />
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
             <main className="flex flex-1 flex-col min-w-0 overflow-hidden">

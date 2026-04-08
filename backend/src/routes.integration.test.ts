@@ -1,7 +1,10 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import request from "supertest";
 import type { Express } from "express";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { generateToken } from "./utils/jwt";
+import { publishEmailJob } from "./lib/emailQueue";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const prismaMock = {
@@ -34,6 +37,7 @@ const prismaMock = {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
+    updateMany: vi.fn().mockResolvedValue({ count: 0 }),
   },
   favoriteFolder: {
     findMany: vi.fn(),
@@ -396,6 +400,10 @@ describe("Routes integration", () => {
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
   describe("Admin", () => {
+    afterEach(() => {
+      delete process.env.ADMIN_EMAILS;
+    });
+
     it("POST /api/admin/send-email returns 403 for non-admin", async () => {
       const response = await request(app)
         .post("/api/admin/send-email")
@@ -411,6 +419,85 @@ describe("Routes integration", () => {
         .send({ to: "user@mail.com", subject: "test", body: "<p>hello</p>" });
 
       expect(response.status).toBe(401);
+    });
+
+    it("POST /api/admin/send-email returns 200 and enqueues manual_email job", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+      vi.mocked(publishEmailJob).mockResolvedValue("mock-job-id");
+
+      const response = await request(app)
+        .post("/api/admin/send-email")
+        .set("Cookie", adminCookie())
+        .send({ to: "destino@mail.com", subject: "Assunto", body: "<p>Corpo</p>" });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ message: "Email enviado com sucesso" });
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledOnce();
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledWith("manual_email", {
+        to: "destino@mail.com",
+        subject: "Assunto",
+        html: "<p>Corpo</p>",
+      });
+    });
+
+    it("POST /api/admin/send-email returns 200 even when job returns empty jobId", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+      vi.mocked(publishEmailJob).mockResolvedValue("");
+
+      const response = await request(app)
+        .post("/api/admin/send-email")
+        .set("Cookie", adminCookie())
+        .send({ to: "destino@mail.com", subject: "Assunto", body: "<p>Corpo</p>" });
+
+      expect(response.status).toBe(200);
+      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledOnce();
+    });
+  });
+
+  // ─── Events (SSE) ──────────────────────────────────────────────────────────
+
+  describe("Events (SSE)", () => {
+    it("GET /api/events retorna 401 sem autenticação", async () => {
+      const res = await request(app).get("/api/events");
+      expect(res.status).toBe(401);
+    });
+
+    it("GET /api/events retorna cabeçalhos text/event-stream com autenticação", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "user@mail.com",
+        name: "Test User",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // supertest não suporta respostas que nunca fecham (SSE);
+      // usamos http.get direto para verificar os headers e abortar em seguida
+      const server = app.listen(0);
+      const { port } = server.address() as AddressInfo;
+      const token = generateToken({ userId: "user-1", email: "user@mail.com" });
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const req = http.get(
+            `http://localhost:${port}/api/events`,
+            { headers: { Cookie: `access_token=${token}` } },
+            (res) => {
+              expect(res.statusCode).toBe(200);
+              expect(res.headers["content-type"]).toContain("text/event-stream");
+              expect(res.headers["x-accel-buffering"]).toBe("no");
+              res.destroy();
+              resolve();
+            }
+          );
+          req.on("error", (err: NodeJS.ErrnoException) => {
+            if (err.code === "ECONNRESET") resolve();
+            else reject(err);
+          });
+        });
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
     });
   });
 

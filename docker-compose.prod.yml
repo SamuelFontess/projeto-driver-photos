@@ -97,9 +97,8 @@ services:
       AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-20}
       UPLOAD_RATE_LIMIT_WINDOW_MS: ${UPLOAD_RATE_LIMIT_WINDOW_MS:-60000}
       UPLOAD_RATE_LIMIT_MAX: ${UPLOAD_RATE_LIMIT_MAX:-15}
-      BREVO_API_KEY: ${BREVO_API_KEY}
-      BREVO_FROM: ${BREVO_FROM}
-      BREVO_FROM_NAME: ${BREVO_FROM_NAME:-Driver App}
+      EMAIL_WORKER_WS_URL: ${EMAIL_WORKER_WS_URL:-ws://driver_email_worker:3002}
+      EMAIL_WORKER_ADMIN_API_KEY: ${EMAIL_WORKER_ADMIN_API_KEY}
       EMAIL_QUEUE_KEY: ${EMAIL_QUEUE_KEY:-driver:email:events}
       PASSWORD_RESET_TOKEN_TTL_MINUTES: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:-30}
       GOOGLE_APPLICATION_CREDENTIALS: /app/serviceAccountKey.json
@@ -163,10 +162,10 @@ services:
       WATCHTOWER_POLL_INTERVAL: 300
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_LABEL_ENABLE: "true"
-      REPO_USER: samuelfontess
-      REPO_PASS: ${GITHUB_TOKEN}
+      DOCKER_CONFIG: /config
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKER_CONFIG_PATH}:/config:ro
     networks:
       - driver_net
 

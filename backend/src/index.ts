@@ -47,6 +47,7 @@ async function bootstrap() {
   initFirebase();
   const { getRedisClient } = await import('./lib/redis');
 
+  const { startWsClient } = await import('./lib/wsClient');
   const PORT = process.env.PORT || 3000;
   if (require.main === module) {
     app.listen(PORT, async () => {
@@ -71,6 +72,7 @@ async function bootstrap() {
           console.log('Redis cache: not available (preview cache will be skipped)');
         });
       console.log('Redis queue: managed by BullMQ (connects on first job publish)');
+      startWsClient();
     });
   }
 }

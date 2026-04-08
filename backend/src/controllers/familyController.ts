@@ -250,7 +250,67 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
     });
 
     if (!invitedUser) {
-      res.status(404).json({ error: 'User with this email was not found' });
+      // Usuário não tem conta ainda: convite de registro
+      const existing = await prisma.familyMember.findFirst({
+        where: { familyId, email: normalizedEmail },
+        select: FAMILY_MEMBER_SELECT,
+      });
+
+      if (existing?.status === 'accepted') {
+        res.status(409).json({ error: 'User is already a member of this family' });
+        return;
+      }
+
+      const inviter = await prisma.user.findUnique({
+        where: { id: invitedById },
+        select: { name: true, email: true },
+      });
+
+      const registerPayload = {
+        familyId: family.id,
+        familyName: family.name,
+        invitedById,
+        invitedEmail: normalizedEmail,
+        inviterName: inviter?.name ?? 'Alguém',
+        inviterEmail: inviter?.email ?? '',
+      };
+
+      if (existing) {
+        const invite = await prisma.familyMember.update({
+          where: { id: existing.id },
+          data: { status: 'pending', invitedById, invitedAt: new Date() },
+          select: FAMILY_MEMBER_SELECT,
+        });
+
+        await createAuditLog({
+          req,
+          action: 'family.invite',
+          resourceType: 'family_member',
+          resourceId: invite.id,
+          userId: invitedById,
+          metadata: { familyId, invitedEmail: normalizedEmail, resent: true },
+        });
+
+        await publishEmailJob('family_invite_register', { ...registerPayload, invitationId: invite.id });
+        res.status(200).json({ invitation: invite });
+      } else {
+        const invite = await prisma.familyMember.create({
+          data: { familyId, userId: null, email: normalizedEmail, invitedById, status: 'pending' },
+          select: FAMILY_MEMBER_SELECT,
+        });
+
+        await createAuditLog({
+          req,
+          action: 'family.invite',
+          resourceType: 'family_member',
+          resourceId: invite.id,
+          userId: invitedById,
+          metadata: { familyId, invitedEmail: normalizedEmail },
+        });
+
+        await publishEmailJob('family_invite_register', { ...registerPayload, invitationId: invite.id });
+        res.status(201).json({ invitation: invite });
+      }
       return;
     }
 
@@ -267,11 +327,17 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
       select: FAMILY_MEMBER_SELECT,
     });
 
+    if (existing?.status === 'accepted') {
+      res.status(409).json({ error: 'User is already a member of this family' });
+      return;
+    }
+
+    const inviter = await prisma.user.findUnique({
+      where: { id: invitedById },
+      select: { name: true, email: true },
+    });
+
     if (existing) {
-      if (existing.status === 'accepted') {
-        res.status(409).json({ error: 'User is already a member of this family' });
-        return;
-      }
       // pending ou declined: atualizar registro e reenviar convite
       const invite = await prisma.familyMember.update({
         where: { id: existing.id },
@@ -294,11 +360,6 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
           invitedEmail: normalizedEmail,
           resent: true,
         },
-      });
-
-      const inviter = await prisma.user.findUnique({
-        where: { id: invitedById },
-        select: { name: true, email: true },
       });
 
       await publishEmailJob('family_invite', {
@@ -337,11 +398,6 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         familyId,
         invitedEmail: normalizedEmail,
       },
-    });
-
-    const inviter = await prisma.user.findUnique({
-      where: { id: invitedById },
-      select: { name: true, email: true },
     });
 
     await publishEmailJob('family_invite', {
