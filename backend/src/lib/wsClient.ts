@@ -29,6 +29,8 @@ function connect(attempt = 0): void {
       const event = JSON.parse(raw.toString()) as { event?: string; userId?: string };
       if (event.event === 'email:status' && event.userId) {
         sseManager.emit(event.userId, event);
+      } else if (event.event === 'message') {
+        sseManager.broadcast(event);
       }
     } catch {
       // ignore malformed messages

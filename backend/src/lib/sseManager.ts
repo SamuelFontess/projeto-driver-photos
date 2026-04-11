@@ -25,6 +25,15 @@ class SseManager {
       res.write(payload);
     }
   }
+
+  broadcast(data: unknown): void {
+    const payload = `data: ${JSON.stringify(data)}\n\n`;
+    for (const set of this.connections.values()) {
+      for (const res of set) {
+        res.write(payload);
+      }
+    }
+  }
 }
 
 export const sseManager = new SseManager();
