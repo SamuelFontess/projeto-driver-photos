@@ -33,15 +33,30 @@ export async function publishEmailJob<T extends Record<string, unknown>>(
   type: EmailJobType,
   payload: T,
 ): Promise<string> {
-  const job = await getQueue().add(type, payload);
-  logger.info('Email job published', { type, jobId: job.id });
-  return job.id ?? '';
+  try {
+    const job = await getQueue().add(type, payload);
+    logger.info('Email job published', { type, jobId: job.id });
+    return job.id ?? '';
+  } catch (error) {
+    logger.error('Email job publish failed', {
+      type,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return '';
+  }
 }
 
 export async function publishEmailJobsBulk(
   jobs: { type: EmailJobType; payload: Record<string, unknown> }[],
 ): Promise<void> {
   if (jobs.length === 0) return;
-  await getQueue().addBulk(jobs.map(({ type, payload }) => ({ name: type, data: payload })));
-  logger.info('Email jobs bulk published', { count: jobs.length });
+  try {
+    await getQueue().addBulk(jobs.map(({ type, payload }) => ({ name: type, data: payload })));
+    logger.info('Email jobs bulk published', { count: jobs.length });
+  } catch (error) {
+    logger.error('Email jobs bulk publish failed', {
+      count: jobs.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
