@@ -2,7 +2,7 @@ import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { logger } from './logger';
 
-export type EmailJobType = 'family_invite' | 'family_invite_register' | 'forgot_password' | 'manual_email';
+export type EmailJobType = 'family_invite' | 'family_invite_register' | 'forgot_password' | 'manual_email' | 'broadcast_email';
 
 let emailQueue: Queue | null = null;
 
