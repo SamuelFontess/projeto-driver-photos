@@ -4,13 +4,15 @@ import request from "supertest";
 import type { Express } from "express";
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { generateToken } from "./utils/jwt";
-import { publishEmailJob } from "./lib/emailQueue";
+import { publishEmailJob, publishEmailJobsBulk } from "./lib/emailQueue";
+import { publishBroadcastJob } from "./lib/broadcastQueue";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const prismaMock = {
   user: {
     findUnique: vi.fn(),
     findFirst: vi.fn(),
+    findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
   },
@@ -90,6 +92,12 @@ vi.mock("./lib/redis", () => ({
 // ─── Email queue mock ─────────────────────────────────────────────────────────
 vi.mock("./lib/emailQueue", () => ({
   publishEmailJob: vi.fn().mockResolvedValue("mock-job-id"),
+  publishEmailJobsBulk: vi.fn().mockResolvedValue(undefined),
+}));
+
+// ─── Broadcast queue mock ─────────────────────────────────────────────────────
+vi.mock("./lib/broadcastQueue", () => ({
+  publishBroadcastJob: vi.fn().mockResolvedValue("mock-broadcast-id"),
 }));
 
 let app: Express;
@@ -538,6 +546,72 @@ describe("Routes integration", () => {
 
       expect(response.status).toBe(200);
       expect(vi.mocked(publishEmailJob)).toHaveBeenCalledOnce();
+    });
+
+    it("POST /api/admin/broadcast returns 401 without auth", async () => {
+      const response = await request(app)
+        .post("/api/admin/broadcast")
+        .send({ title: "Aviso", message: "Olá a todos" });
+
+      expect(response.status).toBe(401);
+    });
+
+    it("POST /api/admin/broadcast returns 403 for non-admin", async () => {
+      const response = await request(app)
+        .post("/api/admin/broadcast")
+        .set("Cookie", authCookie())
+        .send({ title: "Aviso", message: "Olá a todos" });
+
+      expect(response.status).toBe(403);
+    });
+
+    it("POST /api/admin/broadcast returns 400 when title or message is missing", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+
+      const response = await request(app)
+        .post("/api/admin/broadcast")
+        .set("Cookie", adminCookie())
+        .send({ title: "", message: "msg" });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("POST /api/admin/broadcast returns 200 e enfileira broadcast_message sem email", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+
+      const response = await request(app)
+        .post("/api/admin/broadcast")
+        .set("Cookie", adminCookie())
+        .send({ title: "Aviso", message: "Sistema em manutenção", sendEmail: false });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toMatch(/sucesso/i);
+      expect(vi.mocked(publishBroadcastJob)).toHaveBeenCalledOnce();
+      expect(vi.mocked(publishBroadcastJob)).toHaveBeenCalledWith(
+        expect.objectContaining({ content: "Sistema em manutenção" }),
+      );
+      expect(vi.mocked(publishEmailJob)).not.toHaveBeenCalled();
+    });
+
+    it("POST /api/admin/broadcast com sendEmail=true enfileira broadcast + broadcast_email por usuário", async () => {
+      process.env.ADMIN_EMAILS = "admin@test.com";
+      prismaMock.user.findMany.mockResolvedValue([
+        { email: "user1@mail.com" },
+        { email: "user2@mail.com" },
+      ]);
+
+      const response = await request(app)
+        .post("/api/admin/broadcast")
+        .set("Cookie", adminCookie())
+        .send({ title: "Novidade", message: "Temos uma novidade!", sendEmail: true });
+
+      expect(response.status).toBe(200);
+      expect(vi.mocked(publishBroadcastJob)).toHaveBeenCalledOnce();
+      expect(vi.mocked(publishEmailJobsBulk)).toHaveBeenCalledOnce();
+      expect(vi.mocked(publishEmailJobsBulk)).toHaveBeenCalledWith([
+        { type: "broadcast_email", payload: expect.objectContaining({ to: "user1@mail.com", subject: "Novidade" }) },
+        { type: "broadcast_email", payload: expect.objectContaining({ to: "user2@mail.com", subject: "Novidade" }) },
+      ]);
     });
   });
 

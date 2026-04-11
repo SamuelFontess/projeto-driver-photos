@@ -5,7 +5,7 @@ import { SidebarProvider } from '@/src/contexts/SidebarContext';
 import { ProtectedRoute } from '@/src/components/auth/ProtectedRoute';
 import { Sidebar } from '@/src/components/layout/sidebar';
 import { Loader2 } from 'lucide-react';
-import { useEmailStatusSse, type EmailStatusEvent } from '@/src/hooks/use-email-status-sse';
+import { useEmailStatusSse, type EmailStatusEvent, type SseMessageEvent } from '@/src/hooks/use-email-status-sse';
 import { useToast } from '@/src/hooks/use-toast';
 
 const EMAIL_STATUS_LABELS: Record<EmailStatusEvent['type'], string> = {
@@ -13,6 +13,7 @@ const EMAIL_STATUS_LABELS: Record<EmailStatusEvent['type'], string> = {
   family_invite_register: 'Convite de família',
   forgot_password: 'Redefinição de senha',
   manual_email: 'E-mail enviado',
+  broadcast_email: 'E-mail enviado',
 };
 
 function DashboardLayoutFallback() {
@@ -45,7 +46,14 @@ function EmailStatusListener() {
     }
   }, [toast]);
 
-  useEmailStatusSse(handleEmailStatus);
+  const handleMessage = useCallback((event: SseMessageEvent) => {
+    toast({
+      title: event.type ?? 'Aviso do sistema',
+      description: event.content,
+    });
+  }, [toast]);
+
+  useEmailStatusSse(handleEmailStatus, handleMessage);
 
   return null;
 }

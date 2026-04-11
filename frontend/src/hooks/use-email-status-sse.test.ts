@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useEmailStatusSse, type EmailStatusEvent } from './use-email-status-sse';
+import { useEmailStatusSse, type EmailStatusEvent, type SseMessageEvent } from './use-email-status-sse';
 
 class MockEventSource {
   static instance: MockEventSource | null = null;
@@ -88,5 +88,58 @@ describe('useEmailStatusSse', () => {
     unmount();
 
     expect(es.close).toHaveBeenCalledOnce();
+  });
+
+  it('chama onMessage para evento message válido', () => {
+    const onEvent = vi.fn();
+    const onMessage = vi.fn();
+    renderHook(() => useEmailStatusSse(onEvent, onMessage));
+
+    const event: SseMessageEvent = {
+      event: 'message',
+      id: 'msg-1',
+      type: 'admin',
+      content: 'Sistema em manutenção',
+      createdAt: new Date().toISOString(),
+    };
+    MockEventSource.instance!.trigger(event);
+
+    expect(onMessage).toHaveBeenCalledOnce();
+    expect(onMessage).toHaveBeenCalledWith(event);
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it('não chama onMessage quando não fornecido para evento message', () => {
+    const onEvent = vi.fn();
+    renderHook(() => useEmailStatusSse(onEvent));
+
+    MockEventSource.instance!.trigger({
+      event: 'message',
+      id: 'msg-2',
+      content: 'Olá',
+      createdAt: new Date().toISOString(),
+    });
+
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it('usa sempre o callback onMessage mais recente sem recriar EventSource', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ cb }) => useEmailStatusSse(vi.fn(), cb),
+      { initialProps: { cb: first } },
+    );
+
+    const es = MockEventSource.instance!;
+    rerender({ cb: second });
+
+    expect(MockEventSource.instance).toBe(es);
+
+    es.trigger({ event: 'message', id: 'msg-3', content: 'Teste', createdAt: new Date().toISOString() });
+
+    expect(second).toHaveBeenCalledOnce();
+    expect(first).not.toHaveBeenCalled();
   });
 });

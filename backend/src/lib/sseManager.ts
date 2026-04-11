@@ -22,7 +22,34 @@ class SseManager {
     if (!set) return;
     const payload = `data: ${JSON.stringify(data)}\n\n`;
     for (const res of set) {
-      res.write(payload);
+      if (res.writableEnded || res.destroyed) {
+        set.delete(res);
+        continue;
+      }
+      try {
+        res.write(payload);
+      } catch {
+        set.delete(res);
+      }
+    }
+    if (set.size === 0) this.connections.delete(userId);
+  }
+
+  broadcast(data: unknown): void {
+    const payload = `data: ${JSON.stringify(data)}\n\n`;
+    for (const [userId, set] of this.connections) {
+      for (const res of set) {
+        if (res.writableEnded || res.destroyed) {
+          set.delete(res);
+          continue;
+        }
+        try {
+          res.write(payload);
+        } catch {
+          set.delete(res);
+        }
+      }
+      if (set.size === 0) this.connections.delete(userId);
     }
   }
 }

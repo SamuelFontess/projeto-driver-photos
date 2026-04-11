@@ -2,7 +2,7 @@ import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { logger } from './logger';
 
-export type EmailJobType = 'family_invite' | 'family_invite_register' | 'forgot_password' | 'manual_email';
+export type EmailJobType = 'family_invite' | 'family_invite_register' | 'forgot_password' | 'manual_email' | 'broadcast_email';
 
 let emailQueue: Queue | null = null;
 
@@ -38,10 +38,25 @@ export async function publishEmailJob<T extends Record<string, unknown>>(
     logger.info('Email job published', { type, jobId: job.id });
     return job.id ?? '';
   } catch (error) {
-    logger.warn('Email job publish failed', {
+    logger.error('Email job publish failed', {
       type,
       error: error instanceof Error ? error.message : String(error),
     });
     return '';
+  }
+}
+
+export async function publishEmailJobsBulk(
+  jobs: { type: EmailJobType; payload: Record<string, unknown> }[],
+): Promise<void> {
+  if (jobs.length === 0) return;
+  try {
+    await getQueue().addBulk(jobs.map(({ type, payload }) => ({ name: type, data: payload })));
+    logger.info('Email jobs bulk published', { count: jobs.length });
+  } catch (error) {
+    logger.error('Email jobs bulk publish failed', {
+      count: jobs.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
