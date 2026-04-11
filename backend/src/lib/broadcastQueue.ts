@@ -34,14 +34,7 @@ function getQueue(): Queue {
 }
 
 export async function publishBroadcastJob(payload: BroadcastMessagePayload): Promise<string> {
-  try {
-    const job = await getQueue().add('broadcast_message', payload);
-    logger.info('Broadcast job published', { jobId: job.id });
-    return job.id ?? '';
-  } catch (error) {
-    logger.warn('Broadcast job publish failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return '';
-  }
+  const job = await getQueue().add('broadcast_message', payload);
+  logger.info('Broadcast job published', { jobId: job.id });
+  return job.id ?? '';
 }

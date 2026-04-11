@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { publishEmailJob } from '../lib/emailQueue';
+import { publishEmailJob, publishEmailJobsBulk } from '../lib/emailQueue';
 import { publishBroadcastJob } from '../lib/broadcastQueue';
 import { createAuditLog } from '../lib/auditLog';
 import { logger } from '../lib/logger';
@@ -30,19 +30,15 @@ export async function sendBroadcast(req: Request, res: Response): Promise<void> 
   try {
     const { title, message, sendEmail } = req.body as { title: string; message: string; sendEmail: boolean };
 
-    await publishBroadcastJob({ type: 'admin', content: message });
+    await publishBroadcastJob({ type: title, content: message });
 
     if (sendEmail) {
       const users = await prisma.user.findMany({ select: { email: true } });
-      await Promise.all(
-        users.map((user) =>
-          publishEmailJob('broadcast_email', {
-            to: user.email,
-            subject: title,
-            title,
-            message,
-          }),
-        ),
+      await publishEmailJobsBulk(
+        users.map((user) => ({
+          type: 'broadcast_email' as const,
+          payload: { to: user.email, subject: title, title, message },
+        })),
       );
     }
 

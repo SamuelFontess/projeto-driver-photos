@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useEmailStatusSse, type EmailStatusEvent, type MessageEvent } from './use-email-status-sse';
+import { useEmailStatusSse, type EmailStatusEvent, type SseMessageEvent } from './use-email-status-sse';
 
 class MockEventSource {
   static instance: MockEventSource | null = null;
@@ -95,7 +95,7 @@ describe('useEmailStatusSse', () => {
     const onMessage = vi.fn();
     renderHook(() => useEmailStatusSse(onEvent, onMessage));
 
-    const event: MessageEvent = {
+    const event: SseMessageEvent = {
       event: 'message',
       id: 'msg-1',
       type: 'admin',

@@ -13,7 +13,7 @@ export type EmailStatusEvent = {
   error?: string;
 };
 
-export type MessageEvent = {
+export type SseMessageEvent = {
   event: 'message';
   id: string;
   type?: string;
@@ -24,7 +24,7 @@ export type MessageEvent = {
 
 export function useEmailStatusSse(
   onEvent: (event: EmailStatusEvent) => void,
-  onMessage?: (event: MessageEvent) => void,
+  onMessage?: (event: SseMessageEvent) => void,
 ): void {
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
@@ -42,7 +42,7 @@ export function useEmailStatusSse(
         if (data.event === 'email:status') {
           onEventRef.current(data as EmailStatusEvent);
         } else if (data.event === 'message' && onMessageRef.current) {
-          onMessageRef.current(data as MessageEvent);
+          onMessageRef.current(data as SseMessageEvent);
         }
       } catch {
         // ignore malformed events
