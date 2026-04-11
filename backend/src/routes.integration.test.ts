@@ -4,7 +4,7 @@ import request from "supertest";
 import type { Express } from "express";
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { generateToken } from "./utils/jwt";
-import { publishEmailJob } from "./lib/emailQueue";
+import { publishEmailJob, publishEmailJobsBulk } from "./lib/emailQueue";
 import { publishBroadcastJob } from "./lib/broadcastQueue";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ vi.mock("./lib/redis", () => ({
 // ─── Email queue mock ─────────────────────────────────────────────────────────
 vi.mock("./lib/emailQueue", () => ({
   publishEmailJob: vi.fn().mockResolvedValue("mock-job-id"),
+  publishEmailJobsBulk: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ─── Broadcast queue mock ─────────────────────────────────────────────────────
@@ -606,15 +607,11 @@ describe("Routes integration", () => {
 
       expect(response.status).toBe(200);
       expect(vi.mocked(publishBroadcastJob)).toHaveBeenCalledOnce();
-      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledTimes(2);
-      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledWith(
-        "broadcast_email",
-        expect.objectContaining({ to: "user1@mail.com", subject: "Novidade" }),
-      );
-      expect(vi.mocked(publishEmailJob)).toHaveBeenCalledWith(
-        "broadcast_email",
-        expect.objectContaining({ to: "user2@mail.com", subject: "Novidade" }),
-      );
+      expect(vi.mocked(publishEmailJobsBulk)).toHaveBeenCalledOnce();
+      expect(vi.mocked(publishEmailJobsBulk)).toHaveBeenCalledWith([
+        { type: "broadcast_email", payload: expect.objectContaining({ to: "user1@mail.com", subject: "Novidade" }) },
+        { type: "broadcast_email", payload: expect.objectContaining({ to: "user2@mail.com", subject: "Novidade" }) },
+      ]);
     });
   });
 
