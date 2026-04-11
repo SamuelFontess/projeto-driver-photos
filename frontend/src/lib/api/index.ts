@@ -37,7 +37,7 @@ export type {
   FamilyWithOwner,
 } from './families';
 
-export type { SendAdminEmailPayload } from './admin';
+export type { SendAdminEmailPayload, SendBroadcastPayload } from './admin';
 
 const api = {
   register: auth.register,
@@ -73,6 +73,7 @@ const api = {
   replyFamilyInvitation: families.replyFamilyInvitation,
   getFamilyMembers: families.getFamilyMembers,
   sendAdminEmail: admin.sendAdminEmail,
+  sendBroadcast: admin.sendBroadcast,
 };
 
 export { api };

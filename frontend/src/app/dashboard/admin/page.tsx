@@ -7,7 +7,7 @@ import { useSidebar } from '@/src/contexts/SidebarContext';
 import { api } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@/src/components/ui';
-import { Loader2, ShieldCheck, Menu } from 'lucide-react';
+import { Loader2, ShieldCheck, Menu, Megaphone } from 'lucide-react';
 
 export default function AdminPage() {
   const { user, authReady } = useAuth();
@@ -19,6 +19,11 @@ export default function AdminPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendEmail, setSendEmail] = useState(false);
+  const [broadcasting, setBroadcasting] = useState(false);
 
   useEffect(() => {
     if (authReady && !user?.isAdmin) {
@@ -63,6 +68,45 @@ export default function AdminPage() {
     }
   };
 
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha título e mensagem.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setBroadcasting(true);
+    try {
+      await api.sendBroadcast({
+        title: broadcastTitle.trim(),
+        message: broadcastMessage.trim(),
+        sendEmail,
+      });
+      toast({
+        title: 'Broadcast enviado',
+        description: sendEmail
+          ? 'Notificação enviada a todos os usuários conectados e por email.'
+          : 'Notificação enviada a todos os usuários conectados.',
+      });
+      setBroadcastTitle('');
+      setBroadcastMessage('');
+      setSendEmail(false);
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao enviar broadcast',
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setBroadcasting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -80,7 +124,78 @@ export default function AdminPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto max-w-2xl space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <Megaphone className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Broadcast</CardTitle>
+                  <CardDescription>
+                    Envie uma notificação em tempo real para todos os usuários conectados.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleBroadcast} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="broadcast-title">Título</Label>
+                  <Input
+                    id="broadcast-title"
+                    type="text"
+                    value={broadcastTitle}
+                    onChange={(e) => setBroadcastTitle(e.target.value)}
+                    placeholder="Título da notificação"
+                    disabled={broadcasting}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="broadcast-message">Mensagem</Label>
+                  <textarea
+                    id="broadcast-message"
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                    placeholder="Conteúdo da notificação"
+                    disabled={broadcasting}
+                    required
+                    rows={4}
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="broadcast-send-email"
+                    type="checkbox"
+                    checked={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.checked)}
+                    disabled={broadcasting}
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
+                  <Label htmlFor="broadcast-send-email" className="cursor-pointer font-normal">
+                    Enviar também por email para todos os usuários
+                  </Label>
+                </div>
+
+                <Button type="submit" disabled={broadcasting}>
+                  {broadcasting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar broadcast'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
