@@ -7,6 +7,7 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .min(1, 'Name cannot be empty')
+    .max(255, 'Name is too long')
     .optional(),
 });
 
@@ -30,7 +31,7 @@ export const resetPasswordSchema = z.object({
 
 export const updateProfileSchema = z
   .object({
-    name: z.string().trim().min(1, 'Name cannot be empty').optional(),
+    name: z.string().trim().min(1, 'Name cannot be empty').max(255, 'Name is too long').optional(),
     email: z.string().trim().email('Email must be valid').optional(),
     currentPassword: z.string().min(1, 'Current password is required').optional(),
     newPassword: z.string().min(6, 'New password must be at least 6 characters').optional(),

@@ -54,14 +54,14 @@ export const folderIdParamSchema = z.object({
 });
 
 export const createFolderSchema = z.object({
-  name: z.string().trim().min(1, "Name cannot be empty"),
+  name: z.string().trim().min(1, "Name cannot be empty").max(255, "Name is too long"),
   parentId: optionalFolderIdSchema,
   familyId: optionalFamilyIdSchema,
 });
 
 export const updateFolderSchema = z
   .object({
-    name: z.string().trim().min(1, "Name cannot be empty").optional(),
+    name: z.string().trim().min(1, "Name cannot be empty").max(255, "Name is too long").optional(),
     parentId: optionalFolderIdSchema,
   })
   .refine((data) => data.name !== undefined || data.parentId !== undefined, {
