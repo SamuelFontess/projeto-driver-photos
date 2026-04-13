@@ -34,7 +34,7 @@ export function FamilyCreateCard({ onCreateFamily, isCreating }: FamilyCreateCar
               placeholder="Ex: Família Silva"
               value={familyName}
               onChange={(event) => setFamilyName(event.target.value)}
-              maxLength={80}
+              maxLength={120}
             />
           </div>
           <Button type="submit" disabled={isCreating}>

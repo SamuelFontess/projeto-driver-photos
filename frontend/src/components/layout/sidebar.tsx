@@ -225,7 +225,7 @@ export function Sidebar() {
                 {user?.name || 'Usuário'}
               </p>
               <p className="truncate text-[11px] text-muted-foreground whitespace-nowrap">
-                {user?.email ?? 'usuario@email.com'}
+                {user?.email}
               </p>
             </div>
           </Link>

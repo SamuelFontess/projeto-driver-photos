@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { api, type UpdateProfilePayload } from '@/src/lib/api';
 import { useToast } from '@/src/hooks/use-toast';
@@ -14,20 +14,13 @@ export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const { toast } = useToast();
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      setName(user.name || '');
-      setEmail(user.email || '');
-    }
-  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
