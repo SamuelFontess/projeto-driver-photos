@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -22,10 +22,8 @@ function FamilyInvitePageContent() {
     enabled: !!invitationId,
   });
 
-  const invitation = useMemo(() => {
-    const list = invitationsQuery.data?.invitations ?? [];
-    return list.find((inv) => inv.id === invitationId) ?? null;
-  }, [invitationsQuery.data?.invitations, invitationId]);
+  const invitations = invitationsQuery.data?.invitations ?? [];
+  const invitation = invitations.find((inv) => inv.id === invitationId) ?? null;
 
   const replyMutation = useMutation({
     mutationFn: ({ invitationId: id, action }: { invitationId: string; action: 'accept' | 'decline' }) =>
@@ -54,13 +52,13 @@ function FamilyInvitePageContent() {
     },
   });
 
-  const handleAccept = useCallback(() => {
+  const handleAccept = () => {
     if (invitationId) replyMutation.mutate({ invitationId, action: 'accept' });
-  }, [invitationId, replyMutation]);
+  };
 
-  const handleDecline = useCallback(() => {
+  const handleDecline = () => {
     if (invitationId) replyMutation.mutate({ invitationId, action: 'decline' });
-  }, [invitationId, replyMutation]);
+  };
 
   useEffect(() => {
     if (invitationId === null || invitationId === undefined) {
