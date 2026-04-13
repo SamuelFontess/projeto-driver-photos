@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFiles } from '../hooks/useFiles';
 import { useFolders } from '../hooks/useFolders';
 import { useUpdateFolder, useDeleteFolder, useToggleFavoriteFolder } from '../hooks/useFolderActions';
-import { useFavoriteFolders } from '../hooks/useFavoriteFolders';
 import { useUploadFiles, useDownloadFile, useDeleteFile } from '../hooks/useFileActions';
 import { useDialogState } from '../hooks/useDialogState';
 import { FileActions } from './FileActions';
@@ -42,7 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button, Skeleton } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/use-toast';
 import { type Folder, type FolderFile } from '@/src/lib/api';
-import { type BreadcrumbItem, type FileBrowserScope, type ViewMode } from '../types';
+import { type BreadcrumbItem, type FileBrowserScope, type ViewMode, resolveFamilyId } from '../types';
 import { api } from '@/src/lib/api';
 
 interface FileBrowserProps {
@@ -50,10 +49,6 @@ interface FileBrowserProps {
   basePath?: string;
   showTopHeader?: boolean;
   familyName?: string;
-}
-
-function resolveFamilyId(scope: FileBrowserScope): string | undefined {
-  return scope.type === 'family' ? scope.familyId : undefined;
 }
 
 export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader = true, familyName }: FileBrowserProps) {
@@ -93,8 +88,8 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const folders = useMemo(() => foldersData?.folders ?? [], [foldersData]);
-  const files = useMemo(() => filesData?.files ?? [], [filesData]);
+  const folders = foldersData?.folders ?? [];
+  const files = filesData?.files ?? [];
   const isLoading = foldersLoading || filesLoading;
   const togglingFavoriteId = toggleFavorite.isPending ? (toggleFavorite.variables ?? null) : null;
 
@@ -129,22 +124,18 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
   }, [currentFolderId, familyId, rootPath, router]);
 
   // Filter based on search query
-  const filteredFolders = useMemo(
-    () => folders.filter((folder) =>
-      folder.name.toLowerCase().includes(normalizedSearchQuery.toLowerCase())
-    ),
-    [folders, normalizedSearchQuery]
+  const filteredFolders = folders.filter((folder) =>
+    folder.name.toLowerCase().includes(normalizedSearchQuery.toLowerCase())
   );
-  const filteredFiles = useMemo(() => files, [files]);
-  const favoriteFolders = useFavoriteFolders(filteredFolders);
+  const favoriteFolders = filteredFolders.filter((f) => f.isFavorited);
 
-  const handleEnterFolder = useCallback((folder: Folder) => {
+  const handleEnterFolder = (folder: Folder) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('folder', folder.id);
     router.push(`${rootPath}?${params.toString()}`);
-  }, [rootPath, router, searchParams]);
+  };
 
-  const handleBreadcrumbClick = useCallback((item: BreadcrumbItem) => {
+  const handleBreadcrumbClick = (item: BreadcrumbItem) => {
     if (item.id === null) {
       router.push(rootPath);
     } else {
@@ -152,52 +143,43 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
       params.set('folder', item.id);
       router.push(`${rootPath}?${params.toString()}`);
     }
-  }, [rootPath, router, searchParams]);
+  };
 
-  const handleUploadClick = useCallback(() => {
+  const handleUploadClick = () => {
     fileInputRef.current?.click();
-  }, []);
+  };
 
-  const handleFileInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFiles = e.target.files;
-      if (selectedFiles && selectedFiles.length > 0) {
-        uploadFiles.mutate({
-          files: Array.from(selectedFiles),
-          folderId: currentFolderId,
-        });
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    },
-    [currentFolderId, uploadFiles]
-  );
-
-  const handleFilesSelected = useCallback(
-    (files: File[]) => {
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
       uploadFiles.mutate({
-        files,
+        files: Array.from(selectedFiles),
         folderId: currentFolderId,
       });
-    },
-    [currentFolderId, uploadFiles]
-  );
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
-  const handleDownload = useCallback(
-    (file: { id: string }) => {
-      downloadFile.mutate(file.id);
-    },
-    [downloadFile]
-  );
-  
-  const handlePreview = useCallback((file: FolderFile) => {
+  const handleFilesSelected = (selectedFiles: File[]) => {
+    uploadFiles.mutate({
+      files: selectedFiles,
+      folderId: currentFolderId,
+    });
+  };
+
+  const handleDownload = (file: { id: string }) => {
+    downloadFile.mutate(file.id);
+  };
+
+  const handlePreview = (file: FolderFile) => {
     setPreviewFile(file);
-  }, []);
+  };
 
-  const handleRename = useCallback((folder: Folder) => {
+  const handleRename = (folder: Folder) => {
     dialogs.rename.open(folder);
-  }, [dialogs.rename]);
+  };
 
-  const handleConfirmRename = useCallback(async () => {
+  const handleConfirmRename = async () => {
     if (!dialogs.rename.folderId) return;
     const name = dialogs.rename.folderName.trim();
     if (!name) {
@@ -213,9 +195,9 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
       data: { name },
     });
     dialogs.rename.close();
-  }, [dialogs.rename, updateFolder, toast]);
+  };
 
-  const handleMove = useCallback(async (folder: Folder) => {
+  const handleMove = async (folder: Folder) => {
     dialogs.move.open(folder);
     try {
       const { folders: all } = await api.getFolders(null, { familyId });
@@ -227,63 +209,60 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
         variant: 'destructive',
       });
     }
-  }, [dialogs.move, familyId, toast]);
+  };
 
-  const handleConfirmMove = useCallback(async () => {
+  const handleConfirmMove = async () => {
     if (!dialogs.move.folderId) return;
     await updateFolder.mutateAsync({
       id: dialogs.move.folderId,
       data: { parentId: dialogs.move.targetParentId },
     });
     dialogs.move.close();
-  }, [dialogs.move, updateFolder]);
+  };
 
-  const handleToggleFavorite = useCallback((folder: Folder) => {
+  const handleToggleFavorite = (folder: Folder) => {
     toggleFavorite.mutate(folder.id);
-  }, [toggleFavorite]);
+  };
 
-  const handleDelete = useCallback((folder: Folder) => {
+  const handleDelete = (folder: Folder) => {
     dialogs.deleteFolder.open(folder);
-  }, [dialogs.deleteFolder]);
+  };
 
-  const handleFileDelete = useCallback((file: FolderFile) => {
+  const handleFileDelete = (file: FolderFile) => {
     dialogs.deleteFile.open(file);
-  }, [dialogs.deleteFile]);
+  };
 
-  const handleConfirmDelete = useCallback(async () => {
+  const handleConfirmDelete = async () => {
     if (!dialogs.deleteFolder.folderId) return;
     await deleteFolder.mutateAsync(dialogs.deleteFolder.folderId);
     if (currentFolderId === dialogs.deleteFolder.folderId) {
       router.push(rootPath);
     }
     dialogs.deleteFolder.close();
-  }, [dialogs.deleteFolder, deleteFolder, currentFolderId, rootPath, router]);
+  };
 
-  const handleConfirmFileDelete = useCallback(async () => {
+  const handleConfirmFileDelete = async () => {
     if (!dialogs.deleteFile.fileId) return;
     await deleteFile.mutateAsync(dialogs.deleteFile.fileId);
     if (previewFile?.id === dialogs.deleteFile.fileId) {
       setPreviewFile(null);
     }
     dialogs.deleteFile.close();
-  }, [dialogs.deleteFile, deleteFile, previewFile]);
+  };
 
-  const getAvailableFolders = useCallback(
-    (excludeId: string): Folder[] => {
-      const excludeIds = new Set<string>([excludeId]);
-      const addDescendants = (parentId: string) => {
-        allFolders.forEach((f) => {
-          if (f.parentId === parentId && !excludeIds.has(f.id)) {
-            excludeIds.add(f.id);
-            addDescendants(f.id);
-          }
-        });
-      };
-      addDescendants(excludeId);
-      return allFolders.filter((f) => !excludeIds.has(f.id));
-    },
-    [allFolders]
-  );
+  const getAvailableFolders = (excludeId: string): Folder[] => {
+    const excludeIds = new Set<string>([excludeId]);
+    const addDescendants = (parentId: string) => {
+      allFolders.forEach((f) => {
+        if (f.parentId === parentId && !excludeIds.has(f.id)) {
+          excludeIds.add(f.id);
+          addDescendants(f.id);
+        }
+      });
+    };
+    addDescendants(excludeId);
+    return allFolders.filter((f) => !excludeIds.has(f.id));
+  };
 
   const displayName = user?.name?.trim() || 'Usuário';
 
@@ -317,6 +296,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
               placeholder="Buscar arquivos e pastas..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              maxLength={120}
               className="pl-8 h-9"
             />
           </div>
@@ -382,7 +362,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                 {viewMode === 'grid' ? (
                   <FileGrid
                     folders={filteredFolders}
-                    files={filteredFiles}
+                    files={files}
                     onFolderEnter={handleEnterFolder}
                     onFolderRename={handleRename}
                     onFolderMove={handleMove}
@@ -398,7 +378,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                 ) : (
                   <FileList
                     folders={filteredFolders}
-                    files={filteredFiles}
+                    files={files}
                     onFolderEnter={handleEnterFolder}
                     onFolderRename={handleRename}
                     onFolderMove={handleMove}
@@ -473,7 +453,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="root">Raiz</SelectItem>
-                  {getAvailableFolders(dialogs.move.folderId || '').map((folder) => (
+                  {getAvailableFolders(dialogs.move.folderId!).map((folder) => (
                     <SelectItem key={folder.id} value={folder.id}>
                       {folder.name}
                     </SelectItem>
