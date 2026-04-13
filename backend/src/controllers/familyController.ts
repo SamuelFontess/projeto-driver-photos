@@ -34,8 +34,8 @@ export async function createFamily(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { name } = req.body as { name?: string };
-    const normalizedName = typeof name === 'string' && name.trim() ? name.trim() : null;
+    const { name } = req.body;
+    const normalizedName = name ?? null;
 
     const family = await prisma.family.create({
       data: {
@@ -114,7 +114,7 @@ export async function updateFamily(req: Request, res: Response): Promise<void> {
     }
 
     const { familyId } = req.params;
-    const { name } = req.body as { name?: string | null };
+    const { name } = req.body;
 
     const family = await prisma.family.findUnique({
       where: { id: familyId },
@@ -131,8 +131,7 @@ export async function updateFamily(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const nextName =
-      name === null ? null : typeof name === 'string' && name.trim() ? name.trim() : null;
+    const nextName = name;
 
     const updatedFamily = await prisma.family.update({
       where: { id: familyId },
@@ -224,8 +223,8 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
     }
 
     const { familyId } = req.params;
-    const { email } = req.body as { email: string };
-    const normalizedEmail = email.trim().toLowerCase();
+    const { email } = req.body;
+    const normalizedEmail = email.toLowerCase();
 
     const family = await prisma.family.findUnique({
       where: { id: familyId },
@@ -466,7 +465,7 @@ export async function replyInvitation(req: Request, res: Response): Promise<void
     }
 
     const { id } = req.params;
-    const { action } = req.body as { action: 'accept' | 'decline' };
+    const { action } = req.body;
 
     const userEmail = await getUserPrimaryEmail(userId);
     if (!userEmail) {

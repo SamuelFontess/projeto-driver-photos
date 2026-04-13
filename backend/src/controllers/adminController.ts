@@ -7,7 +7,7 @@ import { prisma } from '../lib/prisma';
 
 export async function sendManualEmail(req: Request, res: Response): Promise<void> {
   try {
-    const { to, subject, body } = req.body as { to: string; subject: string; body: string };
+    const { to, subject, body } = req.body;
 
     await publishEmailJob('manual_email', { to, subject, html: body });
 
@@ -28,7 +28,7 @@ export async function sendManualEmail(req: Request, res: Response): Promise<void
 
 export async function sendBroadcast(req: Request, res: Response): Promise<void> {
   try {
-    const { title, message, sendEmail } = req.body as { title: string; message: string; sendEmail: boolean };
+    const { title, message, sendEmail } = req.body;
 
     await publishBroadcastJob({ type: title, content: message });
 
@@ -47,7 +47,7 @@ export async function sendBroadcast(req: Request, res: Response): Promise<void> 
       action: 'admin.broadcast',
       resourceType: 'user',
       resourceId: null,
-      metadata: { title, sendEmail: sendEmail ?? false },
+      metadata: { title, sendEmail },
     });
 
     res.json({ message: 'Broadcast enviado com sucesso' });

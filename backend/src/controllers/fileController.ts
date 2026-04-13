@@ -560,10 +560,7 @@ export async function update(req: Request, res: Response): Promise<void> {
       }
     }
 
-    const { name, folderId } = req.body as {
-      name?: string;
-      folderId?: string | null;
-    };
+    const { name, folderId } = req.body;
 
     const file = await prisma.file.findFirst({
       where: familyId ? { id, familyId } : { id, userId, familyId: null },
@@ -578,18 +575,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     const updateData: { name?: string; folderId?: string | null } = {};
 
     if (name !== undefined) {
-      if (typeof name !== "string") {
-        res.status(400).json({ error: "Name must be a string" });
-        return;
-      }
-
-      const trimmedName = name.trim();
-      if (!trimmedName) {
-        res.status(400).json({ error: "Name cannot be empty" });
-        return;
-      }
-
-      updateData.name = trimmedName;
+      updateData.name = name;
     }
 
     if (folderId !== undefined) {
