@@ -1,10 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/src/lib/api";
-import { type FileBrowserScope } from "../types";
-
-function resolveFamilyId(scope: FileBrowserScope): string | undefined {
-  return scope.type === "family" ? scope.familyId : undefined;
-}
+import { type FileBrowserScope, resolveFamilyId } from "../types";
 
 export interface UseFilesOptions {
   page?: number;
