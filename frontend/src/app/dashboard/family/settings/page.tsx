@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Mail, Trash2, UserMinus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -39,7 +39,6 @@ function FamilySettingsPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [familyName, setFamilyName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
 
   const {
@@ -53,10 +52,6 @@ function FamilySettingsPageContent() {
   } = useFamilySelection();
 
   const isOwner = Boolean(selectedFamily && user && selectedFamily.ownerId === user.id);
-
-  useEffect(() => {
-    setFamilyName(selectedFamily?.name ?? '');
-  }, [selectedFamily]);
 
   const membersQuery = useQuery({
     queryKey: ['family-members', selectedFamilyId],
@@ -134,15 +129,9 @@ function FamilySettingsPageContent() {
     },
   });
 
-  const acceptedMembers = useMemo(
-    () => membersQuery.data?.members.filter((m) => m.status === 'accepted') ?? [],
-    [membersQuery.data?.members]
-  );
-
-  const pendingInvites = useMemo(
-    () => membersQuery.data?.members.filter((m) => m.status === 'pending') ?? [],
-    [membersQuery.data?.members]
-  );
+  const members = membersQuery.data?.members ?? [];
+  const acceptedMembers = members.filter((m) => m.status === 'accepted');
+  const pendingInvites = members.filter((m) => m.status === 'pending');
 
   const receivedInvitations = invitationsQuery.data?.invitations ?? [];
 
@@ -175,7 +164,9 @@ function FamilySettingsPageContent() {
   const handleUpdateFamily = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedFamilyId) return;
-    updateFamily.mutate({ familyId: selectedFamilyId, name: familyName.trim() || null });
+    const formData = new FormData(event.currentTarget);
+    const name = (formData.get('familyName') as string).trim();
+    updateFamily.mutate({ familyId: selectedFamilyId, name: name || null });
   };
 
   const handleInvite = (event: FormEvent<HTMLFormElement>) => {
@@ -217,10 +208,10 @@ function FamilySettingsPageContent() {
                   <CardDescription>Edite o nome da família.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleUpdateFamily} className="flex gap-2">
+                  <form key={selectedFamilyId} onSubmit={handleUpdateFamily} className="flex gap-2">
                     <Input
-                      value={familyName}
-                      onChange={(e) => setFamilyName(e.target.value)}
+                      name="familyName"
+                      defaultValue={selectedFamily?.name ?? ''}
                       placeholder="Nome da família (opcional)"
                       maxLength={120}
                       className="flex-1"
