@@ -184,8 +184,7 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    type UserShape = { id: string; email: string; name: string | null };
-    let user: UserShape | null = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: { firebaseUid: uid },
       select: { id: true, email: true, name: true },
     });
