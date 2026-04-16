@@ -453,7 +453,7 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="root">Raiz</SelectItem>
-                  {getAvailableFolders(dialogs.move.folderId!).map((folder) => (
+                  {dialogs.move.folderId && getAvailableFolders(dialogs.move.folderId).map((folder) => (
                     <SelectItem key={folder.id} value={folder.id}>
                       {folder.name}
                     </SelectItem>
