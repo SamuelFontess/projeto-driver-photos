@@ -27,14 +27,14 @@ export interface AuthResponse {
   user: {
     id: string;
     email: string;
-    name?: string;
+    name: string | null;
   };
 }
 
 export interface User {
   id: string;
   email: string;
-  name?: string;
+  name: string | null;
   createdAt?: string;
   updatedAt?: string;
   isAdmin?: boolean;

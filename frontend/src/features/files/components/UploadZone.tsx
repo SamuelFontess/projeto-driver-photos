@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Upload } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
@@ -17,31 +17,28 @@ export function UploadZone({
 }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
-  }, []);
+  };
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-  }, []);
+  };
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
 
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length > 0 && !isUploading) {
-        onFilesSelected(files);
-      }
-    },
-    [onFilesSelected, isUploading]
-  );
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0 && !isUploading) {
+      onFilesSelected(droppedFiles);
+    }
+  };
 
   return (
     <div

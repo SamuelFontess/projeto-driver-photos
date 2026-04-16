@@ -35,9 +35,7 @@ function RegisterForm() {
         title: 'Conta criada com sucesso!',
         description: 'Redirecionando...',
       });
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1000);
+      router.push('/dashboard');
     } catch (err: unknown) {
       toast({
         title: 'Erro ao criar conta',

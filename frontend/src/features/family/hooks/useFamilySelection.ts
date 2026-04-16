@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api, type FamilySummary } from '@/src/lib/api';
@@ -35,10 +35,7 @@ export function useFamilySelection(
     queryFn: () => api.getFamilies(),
   });
 
-  const families = useMemo(
-    () => familiesQuery.data?.families ?? [],
-    [familiesQuery.data?.families]
-  );
+  const families = familiesQuery.data?.families ?? [];
   const familyIdFromUrl = searchParams.get('familyId');
 
   useEffect(() => {
@@ -100,14 +97,7 @@ export function useFamilySelection(
     },
   });
 
-  const selectedFamily = useMemo(
-    () => families.find((family) => family.id === selectedFamilyId) ?? null,
-    [families, selectedFamilyId]
-  );
-
-  const setSelectedFamilyId = (familyId: string) => {
-    setSelectedFamilyIdState(familyId);
-  };
+  const selectedFamily = families.find((f) => f.id === selectedFamilyId) ?? null;
 
   const createFamily = async (name?: string): Promise<string> => {
     const response = await createFamilyMutation.mutateAsync(name?.trim() || undefined);
@@ -120,7 +110,7 @@ export function useFamilySelection(
     selectedFamilyId,
     selectedFamily,
     isLoadingFamilies: familiesQuery.isLoading,
-    setSelectedFamilyId,
+    setSelectedFamilyId: setSelectedFamilyIdState,
     createFamily,
     isCreatingFamily: createFamilyMutation.isPending,
   };

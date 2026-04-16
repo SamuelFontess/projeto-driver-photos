@@ -67,6 +67,7 @@ export function Header({
                 placeholder="Buscar..."
                 value={searchValue}
                 onChange={(e) => onSearchChange(e.target.value)}
+                maxLength={120}
                 className="pl-8 sm:pl-9 h-8 sm:h-10 text-xs sm:text-sm"
               />
             </div>

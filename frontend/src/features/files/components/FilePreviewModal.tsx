@@ -10,7 +10,7 @@ import { Button } from '@/src/components/ui';
 import { type FolderFile } from '@/src/lib/api';
 import { Download, File as FileIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/src/lib/api';
 import { useQuery } from '@tanstack/react-query';
 
@@ -29,10 +29,10 @@ export function FilePreviewModal({
 }: FilePreviewModalProps) {
   const [textContent, setTextContent] = useState<string | null>(null);
 
-  const fileKind = useMemo(() => {
+  const getFileKind = () => {
     if (!file) return 'unsupported' as const;
 
-    const mime = (file.mimeType || '').toLowerCase();
+    const mime = file.mimeType.toLowerCase();
     const name = file.name.toLowerCase();
 
     if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(name)) {
@@ -56,7 +56,8 @@ export function FilePreviewModal({
     }
 
     return 'unsupported' as const;
-  }, [file]);
+  };
+  const fileKind = getFileKind();
 
   const previewQuery = useQuery({
     queryKey: ['file-preview-blob', file?.id],
@@ -69,18 +70,17 @@ export function FilePreviewModal({
     gcTime: 15 * 60 * 1000,
   });
 
-  const objectUrl = useMemo(() => {
-    if (!previewQuery.data) return null;
-    return URL.createObjectURL(previewQuery.data);
-  }, [previewQuery.data]);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [objectUrl]);
+    if (!previewQuery.data) {
+      setObjectUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(previewQuery.data);
+    setObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [previewQuery.data]);
 
   useEffect(() => {
     if (!previewQuery.data || fileKind !== 'text') {

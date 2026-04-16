@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 import { createAuditLog } from "../lib/auditLog";
@@ -126,10 +127,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { name, parentId } = req.body as {
-      name?: string;
-      parentId?: string | null;
-    };
+    const { name, parentId } = req.body;
     const familyId = resolveFamilyId(req);
 
     if (familyId) {
@@ -138,17 +136,6 @@ export async function create(req: Request, res: Response): Promise<void> {
         res.status(familyAccess.status).json({ error: familyAccess.error });
         return;
       }
-    }
-
-    if (!name || typeof name !== "string") {
-      res.status(400).json({ error: "Name is required" });
-      return;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      res.status(400).json({ error: "Name cannot be empty" });
-      return;
     }
 
     if (parentId != null && parentId !== "") {
@@ -165,7 +152,7 @@ export async function create(req: Request, res: Response): Promise<void> {
 
     const folder = await prisma.folder.create({
       data: {
-        name: trimmedName,
+        name,
         userId,
         familyId,
         parentId: parentId && parentId !== "" ? parentId : null,
@@ -357,12 +344,9 @@ async function isDescendant(
       return true;
     }
 
-    type FolderParent = {
-      parentId: string | null;
-      userId: string;
-      familyId: string | null;
-    } | null;
-    const folderResult: FolderParent = await prisma.folder.findUnique({
+    const folderResult: Prisma.FolderGetPayload<{
+      select: { parentId: true; userId: true; familyId: true };
+    }> | null = await prisma.folder.findUnique({
       where: { id: currentId },
       select: { parentId: true, userId: true, familyId: true },
     });
@@ -397,10 +381,7 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     const { id } = req.params;
     const familyId = resolveFamilyId(req);
-    const { name, parentId } = req.body as {
-      name?: string;
-      parentId?: string | null;
-    };
+    const { name, parentId } = req.body;
 
     if (familyId) {
       const familyAccess = await requireFamilyAccess(userId, familyId);
@@ -423,20 +404,8 @@ export async function update(req: Request, res: Response): Promise<void> {
     // Prepara objeto de atualização
     const updateData: { name?: string; parentId?: string | null } = {};
 
-    // Valida e atualiza name se fornecido
     if (name !== undefined) {
-      if (typeof name !== "string") {
-        res.status(400).json({ error: "Name must be a string" });
-        return;
-      }
-
-      const trimmedName = name.trim();
-      if (!trimmedName) {
-        res.status(400).json({ error: "Name cannot be empty" });
-        return;
-      }
-
-      updateData.name = trimmedName;
+      updateData.name = name;
     }
 
     // Valida e atualiza parentId se fornecido

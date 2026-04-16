@@ -51,23 +51,12 @@ const PASSWORD_RESET_TOKEN_TTL_MINUTES = parsePositiveInt(
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
-    const { email: rawEmail, password, name } = req.body;
-    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : rawEmail;
-
-    // Validação básica
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required' });
-      return;
-    }
-
-    if (password.length < 6) {
-      res.status(400).json({ error: 'Password must be at least 6 characters' });
-      return;
-    }
+    const { email, password, name } = req.body;
+    const normalizedEmail = email.toLowerCase();
 
     // Verificar se o usuário já existe
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -81,9 +70,9 @@ export async function register(req: Request, res: Response): Promise<void> {
     // Criar usuário
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
-        name: name || null,
+        name: name ?? null,
       },
       select: {
         id: true,
@@ -177,12 +166,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 export async function googleAuth(req: Request, res: Response): Promise<void> {
   try {
-    const { idToken } = req.body as { idToken?: string };
-    if (!idToken || typeof idToken !== 'string') {
-      res.status(400).json({ error: 'idToken is required' });
-      return;
-    }
-
+    const { idToken } = req.body;
     initFirebase();
     const auth = admin.auth();
     let decoded: admin.auth.DecodedIdToken;
@@ -200,8 +184,7 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    type UserShape = { id: string; email: string; name: string | null };
-    let user: UserShape | null = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: { firebaseUid: uid },
       select: { id: true, email: true, name: true },
     });
@@ -254,8 +237,8 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
 
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   try {
-    const { email } = req.body as { email: string };
-    const normalizedEmail = email.trim().toLowerCase();
+    const { email } = req.body;
+    const normalizedEmail = email.toLowerCase();
 
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -320,7 +303,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   try {
-    const { token, password } = req.body as { token: string; password: string };
+    const { token, password } = req.body;
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const now = new Date();
 
@@ -461,12 +444,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     }
 
     const userId = req.user.userId;
-    const { name, email, currentPassword, newPassword } = req.body as {
-      name?: string;
-      email?: string;
-      currentPassword?: string;
-      newPassword?: string;
-    };
+    const { name, email, currentPassword, newPassword } = req.body;
 
     // Busca o usuário atual (precisa do password para validar senha atual)
     const currentUser = await prisma.user.findUnique({
@@ -482,25 +460,12 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
 
     // Atualiza nome se fornecido
     if (name !== undefined) {
-      if (typeof name !== 'string') {
-        res.status(400).json({ error: 'Name must be a string' });
-        return;
-      }
-      const trimmedName = name.trim();
-      if (!trimmedName) {
-        res.status(400).json({ error: 'Name cannot be empty' });
-        return;
-      }
-      updateData.name = trimmedName;
+      updateData.name = name;
     }
 
     // Atualiza email se fornecido
     if (email !== undefined) {
-      if (typeof email !== 'string' || !email.trim()) {
-        res.status(400).json({ error: 'Email must be a valid string' });
-        return;
-      }
-      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedEmail = email.toLowerCase();
       
       // Verifica se o email já está em uso por outro usuário
       const existingUser = await prisma.user.findUnique({
@@ -515,10 +480,6 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
 
     // Atualiza senha se fornecida (usuários só-Google podem definir senha pela primeira vez)
     if (newPassword !== undefined) {
-      if (typeof newPassword !== 'string' || newPassword.length < 6) {
-        res.status(400).json({ error: 'New password must be at least 6 characters' });
-        return;
-      }
       if (currentUser.password !== null) {
         if (!currentPassword) {
           res.status(400).json({ error: 'Current password is required to change password' });

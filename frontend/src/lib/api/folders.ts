@@ -23,7 +23,7 @@ export interface FolderFile {
   id: string;
   name: string;
   size: number;
-  mimeType: string | null;
+  mimeType: string;
   folderId: string | null;
   createdAt: string;
   updatedAt: string;

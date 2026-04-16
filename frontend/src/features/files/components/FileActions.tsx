@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useToast } from '@/src/hooks/use-toast';
 import { Button } from '@/src/components/ui';
 import { Plus, Upload, Grid3x3, List } from 'lucide-react';
 import {
@@ -35,11 +36,15 @@ export function FileActions({
   const [newFolderName, setNewFolderName] = useState('');
   const [open, setOpen] = useState(false);
   const createFolder = useCreateFolder(scope);
+  const { toast } = useToast();
 
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newFolderName.trim();
-    if (!name) return;
+    if (!name) {
+      toast({ title: 'Erro', description: 'Digite um nome para a pasta.', variant: 'destructive' });
+      return;
+    }
 
     await createFolder.mutateAsync({
       name,
@@ -79,6 +84,7 @@ export function FileActions({
                   placeholder="Ex: Trabalho"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
+                  maxLength={120}
                   autoFocus
                 />
               </div>

@@ -15,9 +15,7 @@ interface FileIconConfig {
   className: string;
 }
 
-export function getFileIconConfig(mimeType?: string | null): FileIconConfig {
-  if (!mimeType) return { icon: File, className: 'text-muted-foreground' };
-
+export function getFileIconConfig(mimeType: string): FileIconConfig {
   if (mimeType.startsWith('image/')) {
     return { icon: FileImage, className: 'text-blue-500' };
   }
