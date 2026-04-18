@@ -13,7 +13,6 @@ import {
 
 const router = Router();
 
-// Todas as rotas de pastas exigem autenticação
 router.get('/', authenticate, validate(folderListQuerySchema, 'query'), list);
 router.post('/', authenticate, validate(createFolderSchema), create);
 
