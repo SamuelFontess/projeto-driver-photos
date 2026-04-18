@@ -16,6 +16,8 @@ export const filesPaths = {
           schema: { type: 'string', minLength: 1, maxLength: 120 },
           description: 'Busca por nome (insensível a maiúsculas, max 120 chars). Ignora folderId quando usado.',
         },
+        { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 }, description: 'Itens por página' },
+        { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 }, description: 'Página' },
       ],
       responses: {
         '200': {
@@ -26,6 +28,10 @@ export const filesPaths = {
                 type: 'object',
                 properties: {
                   files: { type: 'array', items: { $ref: '#/components/schemas/File' } },
+                  total: { type: 'integer' },
+                  page: { type: 'integer' },
+                  limit: { type: 'integer' },
+                  totalPages: { type: 'integer' },
                 },
               },
             },
