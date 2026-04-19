@@ -29,7 +29,7 @@ export function Sidebar() {
   const router = useRouter();
   const { isExpanded, toggle, isMobileOpen, closeMobile } = useSidebar();
 
-  // Close mobile sidebar on navigation
+  // fecha sidebar no mobile ao navegar
   useEffect(() => {
     closeMobile();
   }, [pathname, closeMobile]);
@@ -45,7 +45,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -58,15 +57,14 @@ export function Sidebar() {
         className={cn(
           'flex h-full flex-col border-r border-border bg-card shrink-0 overflow-hidden',
           'transition-[width,transform] duration-200 ease-in-out',
-          // Desktop: relative, no translate
+          // desktop: posição relativa, sem translate
           'md:relative md:inset-auto md:z-auto md:translate-x-0',
-          // Mobile: fixed, slides in/out
+          // mobile: fixo, desliza para dentro/fora
           'fixed inset-y-0 left-0 z-50',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
           isExpanded ? 'w-60' : 'md:w-16 w-60'
         )}
       >
-        {/* Logo + expand/collapse */}
         <div
           className={cn(
             'flex shrink-0 border-b border-border',
@@ -109,7 +107,6 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Nav */}
         <nav className={cn(
           'flex-1 space-y-0.5',
           isExpanded ? 'py-4' : 'md:pt-6 md:pb-4 py-4'
@@ -196,7 +193,6 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* User block */}
         <div className={cn(
           'border-t border-border shrink-0',
           isExpanded ? 'px-4 pt-4 pb-4' : 'md:p-2 px-4 pt-4 pb-4'

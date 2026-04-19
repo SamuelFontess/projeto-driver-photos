@@ -45,7 +45,7 @@ export function useEmailStatusSse(
           onMessageRef.current(data as SseMessageEvent);
         }
       } catch {
-        // ignore malformed events
+        // ignora eventos malformados
       }
     };
 

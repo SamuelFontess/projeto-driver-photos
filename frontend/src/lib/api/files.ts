@@ -1,5 +1,3 @@
-/** Arquivos: listar, enviar (único ou múltiplos) e baixar. Usa FolderFile da pasta. */
-
 import { request, requestBlob } from "./client";
 import type { FolderFile } from "./folders";
 

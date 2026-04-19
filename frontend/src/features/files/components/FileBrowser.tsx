@@ -70,7 +70,6 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Queries
   const { data: foldersData, isLoading: foldersLoading } = useFolders(currentFolderId, scope);
   const { data: filesData, isLoading: filesLoading } = useFiles(
     currentFolderId,
@@ -78,7 +77,6 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
     normalizedSearchQuery
   );
   
-  // Mutations
   const updateFolder = useUpdateFolder(scope);
   const deleteFolder = useDeleteFolder(scope);
   const toggleFavorite = useToggleFavoriteFolder(scope);
@@ -93,7 +91,6 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
   const isLoading = foldersLoading || filesLoading;
   const togglingFavoriteId = toggleFavorite.isPending ? (toggleFavorite.variables ?? null) : null;
 
-  // Sync breadcrumb with current folder
   useEffect(() => {
     let cancelled = false;
 
@@ -123,7 +120,6 @@ export function FileBrowser({ scope = { type: 'user' }, basePath, showTopHeader 
     return () => { cancelled = true; };
   }, [currentFolderId, familyId, rootPath, router]);
 
-  // Filter based on search query
   const filteredFolders = folders.filter((folder) =>
     folder.name.toLowerCase().includes(normalizedSearchQuery.toLowerCase())
   );
