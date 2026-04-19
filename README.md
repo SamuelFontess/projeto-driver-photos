@@ -79,8 +79,10 @@ Aplicação fullstack de armazenamento de arquivos em nuvem, inspirada no Google
 ```
                       Internet
                           │
+               Cloudflare Tunnel (HTTPS)
+                          │
                      nginx (host)
-                    HTTPS termination
+                    terminação TLS / proxy
                           │
           ┌───────────────┴───────────────┐
           ▼                               ▼
@@ -98,8 +100,8 @@ Aplicação fullstack de armazenamento de arquivos em nuvem, inspirada no Google
                     BullMQ publica job
                             │
                             ▼
-                      email-worker
-                      BullMQ consumer
+                      email-worker          ← serviço separado
+                      BullMQ consumer         (~/email-worker/docker-compose.yml)
                       Brevo API
 ```
 
@@ -172,7 +174,7 @@ Projeto-driver/
 │   │   │   └── familyAccess.ts    # Checagem de permissão familiar
 │   │   └── utils/
 │   │       ├── jwt.ts             # Geração e verificação de JWT (requireEnv pattern)
-│   │       ├── validateEnv.ts     # Validação de 7 vars críticas na startup
+│   │       ├── validateEnv.ts     # Validação de vars críticas na startup (JWT, DB + Firebase)
 │   │       └── parsePositiveInt.ts# Utilitário compartilhado para ler envs numéricas
 │   └── prisma/
 │       └── schema.prisma          # 8 modelos: User, Folder, File, Family,
@@ -380,7 +382,8 @@ O projeto inclui `docker-compose.yml` (dev/staging) e `docker-compose.prod.yml` 
 | `migrations` | backend Dockerfile | — | Roda `prisma migrate deploy` antes do backend |
 | `backend` | backend Dockerfile | 8080 | API Express |
 | `frontend` | frontend Dockerfile | 3000 | Next.js |
-| `email-worker` | email-worker Dockerfile | interno | Consome fila BullMQ |
+
+> O `email-worker` **não** está neste compose. Ele roda de forma independente em `~/email-worker/docker-compose.yml` no servidor, consumindo o mesmo Redis via `REDIS_URL`.
 
 ### Variáveis obrigatórias no .env do servidor
 
@@ -393,6 +396,7 @@ BREVO_API_KEY=...
 BREVO_FROM=noreply@seudominio.com
 DOCS_PASSWORD=...
 COOKIE_SECURE=true
+EMAIL_WORKER_WS_URL=ws://email-worker-host:PORT
 EMAIL_WORKER_ADMIN_API_KEY=...
 ```
 
@@ -406,6 +410,14 @@ O backend expõe a porta 8080 e o frontend a 3000. O nginx no host faz a termina
 server {
     listen 443 ssl;
     server_name seudominio.com;
+
+    location /api/events {
+        proxy_pass http://localhost:8080;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+        proxy_buffering off;
+        proxy_set_header X-Accel-Buffering no;  # necessário para SSE funcionar via nginx
+    }
 
     location /api/ {
         proxy_pass http://localhost:8080;
@@ -444,7 +456,7 @@ O deploy só roda após o CI completar com sucesso (`workflow_run` + `conclusion
 Tokens em localStorage são acessíveis por qualquer JavaScript na página (XSS). Cookies httpOnly não são — o browser os envia automaticamente e scripts não podem lê-los.
 
 ### validateEnv() na startup
-`backend/src/utils/validateEnv.ts` verifica 7 variáveis críticas antes de qualquer módulo ser carregado. Se alguma estiver ausente, o processo termina com mensagem clara em vez de falhar silenciosamente durante uma operação.
+`backend/src/utils/validateEnv.ts` verifica as variáveis críticas antes de qualquer módulo ser carregado: `JWT_SECRET`, `REFRESH_JWT_SECRET` e `DATABASE_URL` são sempre obrigatórias; o Firebase requer uma das três formas (`GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_SERVICE_ACCOUNT_JSON`, ou as três vars individuais). Se alguma estiver ausente, o processo termina com mensagem clara em vez de falhar silenciosamente durante uma operação.
 
 ### Dois Redis
 BullMQ precisa de `noeviction` — um job perdido é um e-mail nunca enviado. Cache de preview pode ser eviccionado livremente sem impacto funcional. Misturar os dois no mesmo Redis com `allkeys-lru` arriscaria apagar jobs de fila sob pressão de memória.

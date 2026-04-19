@@ -103,11 +103,26 @@ DATABASE_URL=postgresql://usuario:senha@localhost:5432/drive_db
 # JWT — gere com: openssl rand -hex 32
 JWT_SECRET=string-longa-aleatória
 REFRESH_JWT_SECRET=string-diferente-da-anterior
+```
 
-# Firebase Admin SDK
+**Firebase** — use uma das três formas:
+
+```env
+# Opção 1 (produção): serviceAccountKey.json montado no container
+GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
+
+# Opção 2: JSON inline como string
+FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
+
+# Opção 3 (dev/local): vars individuais
 FIREBASE_PROJECT_ID=seu-project-id
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxx@projeto.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Em todos os casos, também é necessário:
+
+```env
 FIREBASE_STORAGE_BUCKET=seu-projeto.appspot.com
 ```
 
@@ -145,6 +160,10 @@ NODE_ENV=development
 
 # Admin — lista de e-mails com acesso a rotas /api/admin/*
 ADMIN_EMAILS=admin@seudominio.com
+
+# Email-worker (serviço separado)
+EMAIL_WORKER_WS_URL=ws://email-worker-host:PORT
+EMAIL_WORKER_ADMIN_API_KEY=chave-compartilhada-com-email-worker
 
 # Docs — Basic Auth para GET /api-docs
 DOCS_USER=admin
@@ -244,7 +263,7 @@ backend/
 │   │   └── familyAccess.ts    # isFamilyMember(), requireFamilyAccess()
 │   ├── utils/
 │   │   ├── jwt.ts             # signAccessToken(), signRefreshToken(), verifyToken()
-│   │   ├── validateEnv.ts     # Valida as 7 vars críticas na startup
+│   │   ├── validateEnv.ts     # Valida vars críticas na startup (JWT, DB + Firebase)
 │   │   └── parsePositiveInt.ts# parsePositiveInt(env, fallback): number
 │   └── validation/            # Schemas Zod: authSchemas, fileSchemas,
 │                              # folderSchemas, familySchemas, adminSchemas
