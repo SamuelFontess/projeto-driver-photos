@@ -22,6 +22,8 @@ export default function ProfilePage() {
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  if (!user) return null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
