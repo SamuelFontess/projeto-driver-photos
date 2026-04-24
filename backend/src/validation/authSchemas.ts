@@ -37,7 +37,7 @@ export const updateProfileSchema = z
     newPassword: z.string().min(6, 'New password must be at least 6 characters').optional(),
   })
   .refine(
-    (data) => Object.keys(data).length > 0,
+    (data) => data.name !== undefined || data.email !== undefined || data.newPassword !== undefined,
     { message: 'No fields to update' }
   )
   .refine(
