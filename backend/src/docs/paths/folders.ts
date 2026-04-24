@@ -10,6 +10,8 @@ export const foldersPaths = {
       parameters: [
         { name: 'parentId', in: 'query', schema: { type: 'string' }, description: 'ID da pasta pai (omitir para raiz)' },
         { name: 'familyId', in: 'query', schema: { type: 'string' }, description: 'ID da família para listar pastas compartilhadas' },
+        { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 }, description: 'Itens por página' },
+        { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 }, description: 'Página' },
       ],
       responses: {
         '200': {
@@ -23,6 +25,10 @@ export const foldersPaths = {
                     type: 'array',
                     items: { $ref: '#/components/schemas/FolderWithCounts' },
                   },
+                  total: { type: 'integer' },
+                  page: { type: 'integer' },
+                  limit: { type: 'integer' },
+                  totalPages: { type: 'integer' },
                 },
               },
             },

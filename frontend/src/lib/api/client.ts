@@ -1,5 +1,3 @@
-/** Cliente HTTP: base URL e tratamento de erros. Autenticação via cookie HTTP-only. */
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const RETRYABLE_STATUS = new Set([408, 500, 502, 503, 504]);
 const REFRESH_ENDPOINT = '/api/auth/refresh';
@@ -115,7 +113,7 @@ export async function request<T>(
   return response.json() as Promise<T>;
 }
 
-/** Retorna blob e nome do arquivo (Content-Disposition) para download. */
+// retorna blob e filename extraído do header Content-Disposition
 export async function requestBlob(
   endpoint: string
 ): Promise<{ blob: Blob; filename?: string }> {

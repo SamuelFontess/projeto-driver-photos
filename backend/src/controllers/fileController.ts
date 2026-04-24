@@ -9,6 +9,7 @@ import {
 import { createAuditLog } from "../lib/auditLog";
 import { getFirebaseBucket } from "../lib/firebase";
 import { requireFamilyAccess } from "../lib/familyAccess";
+import { resolveFamilyId } from "../utils/requestHelpers";
 import {
   getPreviewFromCache,
   previewCacheMaxBytes,
@@ -40,18 +41,6 @@ const CAMPOS_ARQUIVO = {
   updatedAt: true,
 } as const;
 
-function normalizeFamilyId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.toLowerCase() === "null") return null;
-  return normalized;
-}
-
-function resolveFamilyId(req: Request): string | null {
-  const fromQuery = normalizeFamilyId(req.query.familyId);
-  if (fromQuery) return fromQuery;
-  return normalizeFamilyId(req.body?.familyId);
-}
 
 export async function list(req: Request, res: Response): Promise<void> {
   try {
@@ -61,22 +50,13 @@ export async function list(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const folderIdParam = req.query.folderId as string | undefined;
+    const folderIdParam = req.query.folderId as string | null | undefined;
     const familyId = resolveFamilyId(req);
-    const searchParam =
-      typeof req.query.search === "string"
-        ? req.query.search.trim()
-        : undefined;
-    const isRoot =
-      folderIdParam === undefined ||
-      folderIdParam === "" ||
-      folderIdParam === "null";
+    const searchParam = req.query.search as string | undefined;
+    const isRoot = folderIdParam == null;
 
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit as string) || 50, 1),
-      200,
-    );
-    const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+    const limit = req.query.limit as unknown as number;
+    const page = req.query.page as unknown as number;
     const skip = (page - 1) * limit;
 
     if (familyId) {
@@ -88,7 +68,7 @@ export async function list(req: Request, res: Response): Promise<void> {
     }
 
     const whereClause =
-      searchParam && searchParam.length > 0
+      searchParam
         ? {
             ...(familyId ? {} : { userId }),
             familyId: familyId ?? null,
@@ -176,7 +156,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
     }
 
     let folderId: string | null = null;
-    if (folderIdParam != null && folderIdParam !== "") {
+    if (folderIdParam != null) {
       const folder = await prisma.folder.findFirst({
         where: familyId
           ? { id: folderIdParam, familyId }
@@ -242,7 +222,7 @@ export async function upload(req: Request, res: Response): Promise<void> {
           select: CAMPOS_ARQUIVO,
         });
       } catch (dbError) {
-        // Prisma failed after Firebase upload succeeded — delete the orphaned file
+        // Prisma falhou após upload no Firebase — remove arquivo órfão
         try {
           await storageFile.delete();
         } catch (deleteError) {
@@ -389,7 +369,7 @@ function setPreviewHeaders(
 ): void {
   const safeName = fileName.replace(/[^\x20-\x7E]/g, "_");
   const encodedName = encodeURIComponent(fileName).replace(/'/g, "%27");
-  res.setHeader("Content-Type", mimeType || "application/octet-stream");
+  res.setHeader("Content-Type", mimeType);
   res.setHeader("Content-Length", String(size));
   res.setHeader(
     "Content-Disposition",
@@ -431,7 +411,7 @@ export async function preview(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const mimeType = fileRecord.mimeType || "application/octet-stream";
+    const mimeType = fileRecord.mimeType;
     const cacheKey = getPreviewCacheKey(fileRecord.id);
     const cached = await getPreviewFromCache(cacheKey);
 
@@ -579,14 +559,11 @@ export async function update(req: Request, res: Response): Promise<void> {
     }
 
     if (folderId !== undefined) {
-      const nextFolderId =
-        folderId === "" || folderId === null ? null : folderId;
-
-      if (nextFolderId !== null) {
+      if (folderId !== null) {
         const folder = await prisma.folder.findFirst({
           where: familyId
-            ? { id: nextFolderId, familyId }
-            : { id: nextFolderId, userId, familyId: null },
+            ? { id: folderId, familyId }
+            : { id: folderId, userId, familyId: null },
           select: { id: true },
         });
 
@@ -596,12 +573,7 @@ export async function update(req: Request, res: Response): Promise<void> {
         }
       }
 
-      updateData.folderId = nextFolderId;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ error: "No fields to update" });
-      return;
+      updateData.folderId = folderId;
     }
 
     const updatedFile = await prisma.file.update({

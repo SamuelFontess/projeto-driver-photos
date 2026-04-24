@@ -35,12 +35,11 @@ export async function createFamily(req: Request, res: Response): Promise<void> {
     }
 
     const { name } = req.body;
-    const normalizedName = name ?? null;
 
     const family = await prisma.family.create({
       data: {
         ownerId,
-        name: normalizedName,
+        name: name ?? null,
       },
       select: FAMILY_SELECT,
     });
@@ -131,11 +130,9 @@ export async function updateFamily(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const nextName = name;
-
     const updatedFamily = await prisma.family.update({
       where: { id: familyId },
-      data: { name: nextName },
+      data: { name },
       select: FAMILY_SELECT,
     });
 
@@ -224,7 +221,6 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
 
     const { familyId } = req.params;
     const { email } = req.body;
-    const normalizedEmail = email.toLowerCase();
 
     const family = await prisma.family.findUnique({
       where: { id: familyId },
@@ -244,14 +240,14 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
     }
 
     const invitedUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { email: email },
       select: { id: true, email: true },
     });
 
     if (!invitedUser) {
       // Usuário não tem conta ainda: convite de registro
       const existing = await prisma.familyMember.findFirst({
-        where: { familyId, email: normalizedEmail },
+        where: { familyId, email: email },
         select: FAMILY_MEMBER_SELECT,
       });
 
@@ -269,7 +265,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         familyId: family.id,
         familyName: family.name,
         invitedById,
-        invitedEmail: normalizedEmail,
+        invitedEmail: email,
         inviterName: inviter?.name || inviter?.email || 'Alguém',
         inviterEmail: inviter?.email ?? '',
       };
@@ -287,14 +283,14 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
           resourceType: 'family_member',
           resourceId: invite.id,
           userId: invitedById,
-          metadata: { familyId, invitedEmail: normalizedEmail, resent: true },
+          metadata: { familyId, invitedEmail: email, resent: true },
         });
 
         await publishEmailJob('family_invite_register', { ...registerPayload, invitationId: invite.id });
         res.status(200).json({ invitation: invite });
       } else {
         const invite = await prisma.familyMember.create({
-          data: { familyId, userId: null, email: normalizedEmail, invitedById, status: 'pending' },
+          data: { familyId, userId: null, email: email, invitedById, status: 'pending' },
           select: FAMILY_MEMBER_SELECT,
         });
 
@@ -304,7 +300,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
           resourceType: 'family_member',
           resourceId: invite.id,
           userId: invitedById,
-          metadata: { familyId, invitedEmail: normalizedEmail },
+          metadata: { familyId, invitedEmail: email },
         });
 
         await publishEmailJob('family_invite_register', { ...registerPayload, invitationId: invite.id });
@@ -321,7 +317,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
     const existing = await prisma.familyMember.findFirst({
       where: {
         familyId,
-        OR: [{ userId: invitedUser.id }, { email: normalizedEmail }],
+        OR: [{ userId: invitedUser.id }, { email: email }],
       },
       select: FAMILY_MEMBER_SELECT,
     });
@@ -356,7 +352,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         userId: invitedById,
         metadata: {
           familyId,
-          invitedEmail: normalizedEmail,
+          invitedEmail: email,
           resent: true,
         },
       });
@@ -367,7 +363,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
         familyName: family.name,
         invitedById,
         invitedUserId: invitedUser.id,
-        invitedEmail: normalizedEmail,
+        invitedEmail: email,
         inviterName: inviter?.name || inviter?.email || 'Alguém',
         inviterEmail: inviter?.email ?? '',
       });
@@ -380,7 +376,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
       data: {
         familyId,
         userId: invitedUser.id,
-        email: normalizedEmail,
+        email: email,
         invitedById,
         status: 'pending',
       },
@@ -395,7 +391,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
       userId: invitedById,
       metadata: {
         familyId,
-        invitedEmail: normalizedEmail,
+        invitedEmail: email,
       },
     });
 
@@ -405,7 +401,7 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
       familyName: family.name,
       invitedById,
       invitedUserId: invitedUser.id,
-      invitedEmail: normalizedEmail,
+      invitedEmail: email,
       inviterName: inviter?.name || inviter?.email || 'Alguém',
       inviterEmail: inviter?.email ?? '',
     });
@@ -538,35 +534,36 @@ export async function listMembers(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const members = await prisma.familyMember.findMany({
-      where: { familyId },
-      orderBy: [{ status: 'asc' }, { invitedAt: 'asc' }],
-      select: {
-        ...FAMILY_MEMBER_SELECT,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
+    const [members, family] = await Promise.all([
+      prisma.familyMember.findMany({
+        where: { familyId },
+        orderBy: [{ status: 'asc' }, { invitedAt: 'asc' }],
+        select: {
+          ...FAMILY_MEMBER_SELECT,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
           },
         },
-      },
-    });
-
-    const family = await prisma.family.findUnique({
-      where: { id: familyId },
-      select: {
-        id: true,
-        name: true,
-        owner: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
+      }),
+      prisma.family.findUnique({
+        where: { id: familyId },
+        select: {
+          id: true,
+          name: true,
+          owner: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
     res.json({ family, members });
   } catch (error) {

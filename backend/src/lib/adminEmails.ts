@@ -1,7 +1,3 @@
-/**
- * Retorna a lista de e-mails admin definidos em ADMIN_EMAILS (separados por vírgula).
- * Normalizado para lowercase e sem espaços extras.
- */
 export function getAdminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || '')
     .split(',')

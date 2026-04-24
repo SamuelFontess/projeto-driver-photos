@@ -1,52 +1,14 @@
 import { z } from "zod";
-
-function normalizeOptionalFolderId(value: unknown): unknown {
-  if (value === undefined) return undefined;
-  if (Array.isArray(value)) return normalizeOptionalFolderId(value[0]);
-  if (value === null) return null;
-  if (typeof value !== "string") return value;
-
-  const normalized = value.trim();
-  if (!normalized || normalized.toLowerCase() === "null") return null;
-  return normalized;
-}
-
-function normalizeOptionalFamilyId(value: unknown): unknown {
-  if (value === undefined) return undefined;
-  if (Array.isArray(value)) return normalizeOptionalFamilyId(value[0]);
-  if (value === null) return null;
-  if (typeof value !== "string") return value;
-
-  const normalized = value.trim();
-  if (!normalized || normalized.toLowerCase() === "null") return null;
-  return normalized;
-}
-
-const optionalFolderIdSchema = z.preprocess(
-  normalizeOptionalFolderId,
-  z.string().min(1).nullable().optional(),
-);
-
-const optionalFamilyIdSchema = z.preprocess(
-  normalizeOptionalFamilyId,
-  z.string().min(1).nullable().optional(),
-);
+import { optionalIdSchema, paginationSchema } from "./sharedSchemas";
 
 export const folderListQuerySchema = z.object({
-  parentId: optionalFolderIdSchema,
-  familyId: optionalFamilyIdSchema,
-  limit: z.preprocess(
-    (v) => (v === undefined ? undefined : Number(Array.isArray(v) ? v[0] : v)),
-    z.number().int().min(1).max(200).optional().default(50),
-  ),
-  page: z.preprocess(
-    (v) => (v === undefined ? undefined : Number(Array.isArray(v) ? v[0] : v)),
-    z.number().int().min(1).optional().default(1),
-  ),
+  parentId: optionalIdSchema,
+  familyId: optionalIdSchema,
+  ...paginationSchema,
 });
 
 export const folderScopeQuerySchema = z.object({
-  familyId: optionalFamilyIdSchema,
+  familyId: optionalIdSchema,
 });
 
 export const folderIdParamSchema = z.object({
@@ -55,14 +17,14 @@ export const folderIdParamSchema = z.object({
 
 export const createFolderSchema = z.object({
   name: z.string().trim().min(1, "Name cannot be empty").max(255, "Name is too long"),
-  parentId: optionalFolderIdSchema,
-  familyId: optionalFamilyIdSchema,
+  parentId: optionalIdSchema,
+  familyId: optionalIdSchema,
 });
 
 export const updateFolderSchema = z
   .object({
     name: z.string().trim().min(1, "Name cannot be empty").max(255, "Name is too long").optional(),
-    parentId: optionalFolderIdSchema,
+    parentId: optionalIdSchema,
   })
   .refine((data) => data.name !== undefined || data.parentId !== undefined, {
     message: "No fields to update",

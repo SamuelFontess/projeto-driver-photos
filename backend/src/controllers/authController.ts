@@ -52,11 +52,9 @@ const PASSWORD_RESET_TOKEN_TTL_MINUTES = parsePositiveInt(
 export async function register(req: Request, res: Response): Promise<void> {
   try {
     const { email, password, name } = req.body;
-    const normalizedEmail = email.toLowerCase();
 
-    // Verificar se o usuário já existe
     const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { email },
     });
 
     if (existingUser) {
@@ -64,13 +62,11 @@ export async function register(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Hash da senha
     const hashedPassword = await hashPassword(password);
 
-    // Criar usuário
     const user = await prisma.user.create({
       data: {
-        email: normalizedEmail,
+        email,
         password: hashedPassword,
         name: name ?? null,
       },
@@ -112,13 +108,6 @@ export async function login(req: Request, res: Response): Promise<void> {
   try {
     const { email, password } = req.body;
 
-    // Validação básica
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required' });
-      return;
-    }
-
-    // Buscar usuário
     const user = await prisma.user.findUnique({
       where: { email },
     });
@@ -238,10 +227,9 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   try {
     const { email } = req.body;
-    const normalizedEmail = email.toLowerCase();
 
     const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { email },
       select: {
         id: true,
         email: true,
@@ -446,7 +434,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     const userId = req.user.userId;
     const { name, email, currentPassword, newPassword } = req.body;
 
-    // Busca o usuário atual (precisa do password para validar senha atual)
+    // busca com senha para validar troca de senha
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -458,27 +446,22 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
 
     const updateData: { name?: string; email?: string; password?: string } = {};
 
-    // Atualiza nome se fornecido
     if (name !== undefined) {
       updateData.name = name;
     }
 
-    // Atualiza email se fornecido
     if (email !== undefined) {
-      const trimmedEmail = email.toLowerCase();
-      
-      // Verifica se o email já está em uso por outro usuário
       const existingUser = await prisma.user.findUnique({
-        where: { email: trimmedEmail },
+        where: { email },
       });
       if (existingUser && existingUser.id !== userId) {
         res.status(409).json({ error: 'Email already in use' });
         return;
       }
-      updateData.email = trimmedEmail;
+      updateData.email = email;
     }
 
-    // Atualiza senha se fornecida (usuários só-Google podem definir senha pela primeira vez)
+    // usuários Google sem senha podem definir pela primeira vez
     if (newPassword !== undefined) {
       if (currentUser.password !== null) {
         if (!currentPassword) {
@@ -494,13 +477,6 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
       updateData.password = await hashPassword(newPassword);
     }
 
-    // Se não há nada para atualizar
-    if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ error: 'No fields to update' });
-      return;
-    }
-
-    // Atualiza o usuário
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,

@@ -41,11 +41,11 @@ export const fileUploadRateLimiter = rateLimit({
   message: { error: 'Too many upload requests. Please try again later.' },
 });
 
-// Dedicated rate limit for forgot-password to prevent email bombing
+// rate limit dedicado para forgot-password — previne email bombing
 const forgotPasswordMaxRequests = parsePositiveInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX, 5);
 
 export const forgotPasswordRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000, // 15 minutos
   max: forgotPasswordMaxRequests,
   standardHeaders: true,
   legacyHeaders: false,

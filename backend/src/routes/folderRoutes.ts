@@ -13,11 +13,10 @@ import {
 
 const router = Router();
 
-// Todas as rotas de pastas exigem autenticação
 router.get('/', authenticate, validate(folderListQuerySchema, 'query'), list);
 router.post('/', authenticate, validate(createFolderSchema), create);
 
-router.get('/favorites', authenticate, validate(folderScopeQuerySchema, 'query'), getFavorites);
+router.get('/favorites', authenticate, getFavorites);
 router.post('/:id/favorite', authenticate, validate(folderIdParamSchema, 'params'), toggleFavorite);
 
 router.get(

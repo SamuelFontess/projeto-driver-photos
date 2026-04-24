@@ -4,21 +4,8 @@ import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 import { createAuditLog } from "../lib/auditLog";
 import { requireFamilyAccess } from "../lib/familyAccess";
+import { resolveFamilyId } from "../utils/requestHelpers";
 
-function normalizeFamilyId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.toLowerCase() === "null") return null;
-  return normalized;
-}
-
-function resolveFamilyId(req: Request): string | null {
-  const fromQuery = normalizeFamilyId(req.query.familyId);
-  if (fromQuery) return fromQuery;
-  return normalizeFamilyId(req.body?.familyId);
-}
-
-// Lista pastas do usuário autenticado (query opcional parentId: omitido/null = raiz).
 export async function list(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
@@ -27,16 +14,12 @@ export async function list(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const parentId = req.query.parentId as string | undefined;
+    const parentId = req.query.parentId as string | null | undefined;
     const familyId = resolveFamilyId(req);
-    const isRoot =
-      parentId === undefined || parentId === "" || parentId === "null";
+    const isRoot = parentId == null;
 
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit as string) || 50, 1),
-      200,
-    );
-    const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+    const limit = req.query.limit as unknown as number;
+    const page = req.query.page as unknown as number;
     const skip = (page - 1) * limit;
 
     if (familyId) {
@@ -76,7 +59,6 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     const favoriteIds = new Set(favoriteRows.map((f) => f.folderId));
 
-    // Adiciona contagens de filhos e arquivos para cada pasta
     const foldersWithCounts = await Promise.all(
       folders.map(async (folder) => {
         const [childrenCount, filesCount] = await Promise.all([
@@ -118,7 +100,6 @@ export async function list(req: Request, res: Response): Promise<void> {
   }
 }
 
-// Cria pasta se parentId for informado, deve existir e pertencer ao mesmo usuário.
 export async function create(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
@@ -138,7 +119,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       }
     }
 
-    if (parentId != null && parentId !== "") {
+    if (parentId != null) {
       const parent = await prisma.folder.findFirst({
         where: familyId
           ? { id: parentId, familyId }
@@ -155,7 +136,7 @@ export async function create(req: Request, res: Response): Promise<void> {
         name,
         userId,
         familyId,
-        parentId: parentId && parentId !== "" ? parentId : null,
+        parentId: parentId ?? null,
       },
       select: {
         id: true,
@@ -166,7 +147,6 @@ export async function create(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // Adiciona contagens de filhos e arquivos
     const [childrenCount, filesCount] = await Promise.all([
       prisma.folder.count({
         where: {
@@ -208,7 +188,6 @@ export async function create(req: Request, res: Response): Promise<void> {
   }
 }
 
-// Busca pasta por id (com filhos e arquivos); 404 se não existir ou não for do usuário.
 export async function get(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
@@ -274,7 +253,7 @@ export async function get(req: Request, res: Response): Promise<void> {
   }
 }
 
-// Remove pasta (Cascade do Prisma remove filhos e arquivos); 404 se não existir ou não for do usuário.
+// cascade do Prisma remove filhos e arquivos recursivamente
 export async function remove(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
@@ -325,7 +304,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
   }
 }
 
-// Helper function para verificar se uma pasta é descendente de outra
+// sobe a árvore de parentId até encontrar ancestorId ou chegar à raiz; visited previne loop em dados corrompidos
 async function isDescendant(
   folderId: string,
   ancestorId: string,
@@ -370,7 +349,6 @@ async function isDescendant(
   return false;
 }
 
-// Atualiza pasta, valida ciclo e dono.
 export async function update(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
@@ -391,7 +369,6 @@ export async function update(req: Request, res: Response): Promise<void> {
       }
     }
 
-    // Verifica se a pasta existe e pertence ao usuário
     const folder = await prisma.folder.findFirst({
       where: familyId ? { id, familyId } : { id, userId, familyId: null },
     });
@@ -401,31 +378,23 @@ export async function update(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Prepara objeto de atualização
     const updateData: { name?: string; parentId?: string | null } = {};
 
     if (name !== undefined) {
       updateData.name = name;
     }
 
-    // Valida e atualiza parentId se fornecido
     if (parentId !== undefined) {
-      // Se parentId é null ou string vazia, move para raiz
-      const newParentId =
-        parentId === "" || parentId === null ? null : parentId;
-
-      // Não pode mover para dentro de si mesma
-      if (newParentId === id) {
+      if (parentId === id) {
         res.status(400).json({ error: "Cannot move folder into itself" });
         return;
       }
 
-      // Se não é raiz, valida que a pasta pai existe e pertence ao usuário
-      if (newParentId !== null) {
+      if (parentId !== null) {
         const parent = await prisma.folder.findFirst({
           where: familyId
-            ? { id: newParentId, familyId }
-            : { id: newParentId, userId, familyId: null },
+            ? { id: parentId, familyId }
+            : { id: parentId, userId, familyId: null },
         });
 
         if (!parent) {
@@ -433,8 +402,7 @@ export async function update(req: Request, res: Response): Promise<void> {
           return;
         }
 
-        // Verifica se não está tentando mover para um descendente (evita ciclo)
-        const wouldCreateCycle = await isDescendant(newParentId, id, {
+        const wouldCreateCycle = await isDescendant(parentId, id, {
           userId,
           familyId,
         });
@@ -446,16 +414,9 @@ export async function update(req: Request, res: Response): Promise<void> {
         }
       }
 
-      updateData.parentId = newParentId;
+      updateData.parentId = parentId;
     }
 
-    // Se não há nada para atualizar
-    if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ error: "No fields to update" });
-      return;
-    }
-
-    // Atualiza a pasta
     const updatedFolder = await prisma.folder.update({
       where: { id },
       data: updateData,
@@ -468,7 +429,6 @@ export async function update(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // Adiciona contagens de filhos e arquivos
     const [childrenCount, filesCount] = await Promise.all([
       prisma.folder.count({
         where: {

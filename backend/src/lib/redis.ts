@@ -15,9 +15,8 @@ export const previewMaxBytes = parsePositiveInt(
   50 * 1024 * 1024
 );
 
-// Cache uses REDIS_CACHE_URL if set, falling back to REDIS_URL (same instance as the email queue).
-// In production with a single Redis container both point to the same host — this is fine.
-// To split cache from queue in the future, add a second Redis container and set REDIS_CACHE_URL.
+// Usa REDIS_CACHE_URL se definido, senão cai em REDIS_URL (mesma instância da fila de email).
+// Para separar cache da fila, adicionar segundo container Redis e definir REDIS_CACHE_URL.
 export const redisCacheUrl = process.env.REDIS_CACHE_URL || process.env.REDIS_URL || 'redis://localhost:6379';
 export const redisConnectTimeoutMs = parsePositiveInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 300);
 
@@ -98,7 +97,7 @@ async function getConnectedClient(): Promise<Redis | null> {
   }
 }
 
-// Kept for backwards compat with index.ts startup log
+// mantido para compatibilidade com o log de startup do index.ts
 export async function getRedisClient(): Promise<Redis | null> {
   return getConnectedClient();
 }

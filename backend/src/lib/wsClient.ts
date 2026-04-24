@@ -33,7 +33,7 @@ function connect(attempt = 0): void {
         sseManager.broadcast(event);
       }
     } catch {
-      // ignore malformed messages
+      // ignora mensagens malformadas
     }
   });
 

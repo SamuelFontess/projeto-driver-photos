@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-// requireEnv throws at module load if the variable is absent.
-// The return type is string (not string | undefined), so all usages below are type-safe.
+// lança erro no carregamento do módulo se a variável não existir — retorno é string, nunca undefined
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -26,7 +25,7 @@ export function generateRefreshToken(payload: JWTPayload): string {
   return jwt.sign(payload, REFRESH_JWT_SECRET, { expiresIn: '30d' });
 }
 
-// Alias mantido para compatibilidade com testes existentes
+// alias mantido para compatibilidade com testes existentes
 export const generateToken = generateAccessToken;
 
 export function verifyToken(token: string): JWTPayload {

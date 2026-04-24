@@ -14,10 +14,9 @@ import { fileUploadRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
-// Listagem por pasta
 router.get('/', authenticate, validate(listFilesQuerySchema, 'query'), list);
 
-// Upload múltiplo: campo "files", body pode ter folderId
+// campo multer é "files"; body aceita folderId
 router.post(
   '/',
   authenticate,
@@ -27,7 +26,6 @@ router.post(
   upload
 );
 
-// Download pelo id do arquivo
 router.get(
   '/:id/download',
   authenticate,

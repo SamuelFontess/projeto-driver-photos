@@ -29,7 +29,6 @@ export function measureUx(
 export function logUxEvent(eventName: string, metadata?: Record<string, unknown>): void {
   if (typeof window === 'undefined') return;
   const now = new Date().toISOString();
-  // Placeholder observability layer: can be replaced by analytics provider.
-  // Kept centralized so migration to a real telemetry backend is straightforward.
+  // trocar console.info por provider de telemetria real aqui
   console.info(`[UX_EVENT] ${eventName}`, { at: now, ...metadata });
 }

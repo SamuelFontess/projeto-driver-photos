@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const registerSchema = z.object({
-  email: z.string().trim().email('Email must be valid'),
+  email: z.string().trim().toLowerCase().email('Email must be valid'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   name: z
     .string()
@@ -12,7 +12,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().trim().email('Email must be valid'),
+  email: z.string().trim().toLowerCase().email('Email must be valid'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -21,7 +21,7 @@ export const googleAuthSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().trim().email('Email must be valid'),
+  email: z.string().trim().toLowerCase().email('Email must be valid'),
 });
 
 export const resetPasswordSchema = z.object({
@@ -32,12 +32,12 @@ export const resetPasswordSchema = z.object({
 export const updateProfileSchema = z
   .object({
     name: z.string().trim().min(1, 'Name cannot be empty').max(255, 'Name is too long').optional(),
-    email: z.string().trim().email('Email must be valid').optional(),
+    email: z.string().trim().toLowerCase().email('Email must be valid').optional(),
     currentPassword: z.string().min(1, 'Current password is required').optional(),
     newPassword: z.string().min(6, 'New password must be at least 6 characters').optional(),
   })
   .refine(
-    (data) => Object.keys(data).length > 0,
+    (data) => data.name !== undefined || data.email !== undefined || data.newPassword !== undefined,
     { message: 'No fields to update' }
   )
   .refine(

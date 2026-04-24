@@ -32,6 +32,7 @@ function getProjectId(): string | null {
 }
 
 function jsonToCertFormat(parsed: JsonServiceAccount): admin.ServiceAccount {
+  // chave privada em variável de ambiente tem \n literal — substitui por quebra de linha real
   const key = (parsed.private_key || '').replace(/\\n/g, '\n').trim();
   return {
     projectId: parsed.project_id,
@@ -63,7 +64,7 @@ function getFirebaseCredential(): CredentialResult {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (projectId && clientEmail && privateKey) {
-    const key = privateKey.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim();
+    const key = privateKey.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim(); // \n literal → quebra real; \r\n → Windows
     return {
       type: 'cert',
       credential: admin.credential.cert({

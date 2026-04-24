@@ -45,11 +45,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
     setUploads((prev) => [...newUploads, ...prev]);
 
-    // Process uploads one by one or in batches
-    // Ideally, we would have a true progress event from the API, 
-    // but fetch doesn't support it easily without XHR or Streams.
-    // For now, we'll simulate progress or just mark as uploading -> success/error.
-
+    // fetch não expõe progresso de upload sem XHR/Streams — status vai direto para success/error
     for (const item of newUploads) {
       setUploads((prev) =>
         prev.map((u) => (u.id === item.id ? { ...u, status: 'uploading' } : u))
@@ -73,7 +69,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Invalidate queries to refresh file list
     queryClient.invalidateQueries({ queryKey: ['files'] });
     queryClient.invalidateQueries({ queryKey: ['folders'] });
   }, [queryClient, toast]);

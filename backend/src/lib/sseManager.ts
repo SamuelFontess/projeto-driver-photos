@@ -21,6 +21,7 @@ class SseManager {
     const set = this.connections.get(userId);
     if (!set) return;
     const payload = `data: ${JSON.stringify(data)}\n\n`;
+    // deletar do Set durante for...of é seguro em JS — o iterador não é afetado
     for (const res of set) {
       if (res.writableEnded || res.destroyed) {
         set.delete(res);
