@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
+import { generalApiRateLimiter } from '../middleware/rateLimit';
 import { sseManager } from '../lib/sseManager';
 
 const router = Router();
 
 const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
 
-router.get('/', authenticate, (req, res) => {
+router.get('/', authenticate, generalApiRateLimiter, (req, res) => {
   const userId = req.user!.userId;
 
   res.setHeader('Content-Type', 'text/event-stream');

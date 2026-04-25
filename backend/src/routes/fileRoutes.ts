@@ -10,7 +10,7 @@ import {
   updateFileSchema,
   uploadFilesBodySchema,
 } from '../validation/fileSchemas';
-import { fileUploadRateLimiter } from '../middleware/rateLimit';
+import { fileAccessRateLimiter, fileUploadRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -29,6 +29,7 @@ router.post(
 router.get(
   '/:id/download',
   authenticate,
+  fileAccessRateLimiter,
   validate(fileIdParamSchema, 'params'),
   validate(fileScopeQuerySchema, 'query'),
   download
@@ -36,6 +37,7 @@ router.get(
 router.get(
   '/:id/preview',
   authenticate,
+  fileAccessRateLimiter,
   validate(fileIdParamSchema, 'params'),
   validate(fileScopeQuerySchema, 'query'),
   preview

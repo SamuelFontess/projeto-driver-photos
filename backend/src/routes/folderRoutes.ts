@@ -3,6 +3,7 @@ import { list, create, get, remove, update } from '../controllers/folderControll
 import { toggleFavorite, getFavorites } from '../controllers/favoriteFolderController';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { generalApiRateLimiter } from '../middleware/rateLimit';
 import {
   createFolderSchema,
   folderIdParamSchema,
@@ -12,6 +13,8 @@ import {
 } from '../validation/folderSchemas';
 
 const router = Router();
+
+router.use(generalApiRateLimiter);
 
 router.get('/', authenticate, validate(folderListQuerySchema, 'query'), list);
 router.post('/', authenticate, validate(createFolderSchema), create);

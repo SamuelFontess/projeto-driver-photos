@@ -41,6 +41,32 @@ export const fileUploadRateLimiter = rateLimit({
   message: { error: 'Too many upload requests. Please try again later.' },
 });
 
+// limita download e preview — previne enumeração e abuso de bandwidth
+export const fileAccessRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+
+// previne abuso de convites por conta comprometida
+export const inviteRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many invite requests. Please try again later.' },
+});
+
+export const generalApiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+
 // rate limit dedicado para forgot-password — previne email bombing
 const forgotPasswordMaxRequests = parsePositiveInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX, 5);
 
