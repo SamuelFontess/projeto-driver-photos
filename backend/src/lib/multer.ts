@@ -19,10 +19,8 @@ export const allowed_upload_mime_types = new Set([
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
   'text/plain',
   'text/csv',
-  'text/html',
 ]);
 
 export function isAllowedUploadMimeType(mimeType: string): boolean {
