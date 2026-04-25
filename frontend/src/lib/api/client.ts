@@ -122,6 +122,11 @@ export async function requestBlob(
     credentials: 'include',
   });
 
+  if (response.status === 401) {
+    notifySessionExpired();
+    throw new ApiError('Session expired', 401);
+  }
+
   if (!response.ok) {
     const message = await parseError(response);
     throw new ApiError(message, response.status);
