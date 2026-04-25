@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 function generateNonce(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  return Buffer.from(array).toString('base64');
+  return btoa(String.fromCharCode(...Array.from(array)));
 }
 
 export function middleware(request: NextRequest) {
