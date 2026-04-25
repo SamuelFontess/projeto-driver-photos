@@ -11,6 +11,7 @@ import { getFirebaseBucket } from "../lib/firebase";
 import { requireFamilyAccess } from "../lib/familyAccess";
 import { resolveFamilyId } from "../utils/requestHelpers";
 import {
+  deleteFromPreviewCache,
   getPreviewFromCache,
   previewCacheMaxBytes,
   previewMaxBytes,
@@ -582,6 +583,8 @@ export async function update(req: Request, res: Response): Promise<void> {
       select: CAMPOS_ARQUIVO,
     });
 
+    await deleteFromPreviewCache(getPreviewCacheKey(updatedFile.id));
+
     await createAuditLog({
       req,
       action: "file.update",
@@ -649,6 +652,8 @@ export async function remove(req: Request, res: Response): Promise<void> {
     await prisma.file.delete({
       where: { id: file.id },
     });
+
+    await deleteFromPreviewCache(getPreviewCacheKey(file.id));
 
     await createAuditLog({
       req,

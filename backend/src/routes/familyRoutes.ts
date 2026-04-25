@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { inviteRateLimiter } from '../middleware/rateLimit';
 import {
   createFamily,
   deleteFamily,
@@ -33,6 +34,7 @@ router.delete('/:familyId', validate(familyIdParamSchema, 'params'), deleteFamil
 
 router.post(
   '/:familyId/invites',
+  inviteRateLimiter,
   validate(familyIdParamSchema, 'params'),
   validate(createFamilyInviteSchema),
   inviteMember

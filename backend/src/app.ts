@@ -1,4 +1,5 @@
 import express from 'express';
+import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { apiReference } from '@scalar/express-api-reference';
@@ -14,7 +15,19 @@ import { openApiSpec } from './docs/openapi';
 
 export const app = express();
 
+app.disable('x-powered-by');
 app.set('trust proxy', 1);
+
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('combined'));
+}
+
+if (process.env.NODE_ENV === 'production') {
+  app.use((_req, res, next) => {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+  });
+}
 
 app.use(
   cors({

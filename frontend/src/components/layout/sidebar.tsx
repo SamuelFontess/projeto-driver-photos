@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useSidebar } from '@/src/contexts/SidebarContext';
 import { cn } from '@/src/lib/utils';
@@ -27,6 +28,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isExpanded, toggle, isMobileOpen, closeMobile } = useSidebar();
 
   // fecha sidebar no mobile ao navegar
@@ -36,6 +38,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear();
     router.push('/login');
   };
 
