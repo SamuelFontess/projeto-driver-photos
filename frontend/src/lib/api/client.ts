@@ -113,25 +113,7 @@ export async function request<T>(
   return response.json() as Promise<T>;
 }
 
-// retorna blob e filename extraído do header Content-Disposition
-export async function requestBlob(
-  endpoint: string
-): Promise<{ blob: Blob; filename?: string }> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method: 'GET',
-    credentials: 'include',
-  });
-
-  if (response.status === 401) {
-    notifySessionExpired();
-    throw new ApiError('Session expired', 401);
-  }
-
-  if (!response.ok) {
-    const message = await parseError(response);
-    throw new ApiError(message, response.status);
-  }
-
+async function extractBlobResponse(response: Response): Promise<{ blob: Blob; filename?: string }> {
   const blob = await response.blob();
   const disposition = response.headers.get('Content-Disposition');
   let filename: string | undefined;
@@ -143,4 +125,35 @@ export async function requestBlob(
     }
   }
   return { blob, filename };
+}
+
+// retorna blob e filename extraído do header Content-Disposition
+export async function requestBlob(
+  endpoint: string
+): Promise<{ blob: Blob; filename?: string }> {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+
+  if (response.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      const retryResponse = await fetch(`${API_URL}${endpoint}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (retryResponse.ok) return extractBlobResponse(retryResponse);
+      notifySessionExpired();
+      throw new ApiError('Session expired', retryResponse.status);
+    }
+    notifySessionExpired();
+    throw new ApiError('Session expired', 401);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(await parseError(response), response.status);
+  }
+
+  return extractBlobResponse(response);
 }
