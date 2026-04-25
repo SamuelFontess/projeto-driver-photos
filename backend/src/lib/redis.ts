@@ -119,6 +119,20 @@ export async function getPreviewFromCache(cacheKey: string): Promise<Buffer | nu
   }
 }
 
+export async function deleteFromPreviewCache(cacheKey: string): Promise<void> {
+  const client = await getConnectedClient();
+  if (!client) return;
+
+  try {
+    await client.del(cacheKey);
+  } catch (error) {
+    logger.warn('Preview cache delete failed', {
+      cacheKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export async function setPreviewInCache(cacheKey: string, value: Buffer): Promise<void> {
   const client = await getConnectedClient();
   if (!client) return;
