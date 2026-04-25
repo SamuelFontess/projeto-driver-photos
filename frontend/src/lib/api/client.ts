@@ -144,8 +144,7 @@ export async function requestBlob(
         credentials: 'include',
       });
       if (retryResponse.ok) return extractBlobResponse(retryResponse);
-      notifySessionExpired();
-      throw new ApiError('Session expired', retryResponse.status);
+      throw new ApiError(await parseError(retryResponse), retryResponse.status);
     }
     notifySessionExpired();
     throw new ApiError('Session expired', 401);
