@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-/**
- * Server-side route guard for /dashboard/* routes.
- * Redirects to /login if the access_token cookie is absent.
- * This prevents the dashboard HTML from being served to unauthenticated requests.
- *
- * Note: this is a presence check only (cookie exists → allow).
- * Full token signature validation requires the JWT_SECRET which must not be
- * exposed to the Next.js edge runtime. The backend validates the token on every
- * authenticated API call.
- */
+function generateNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Buffer.from(array).toString('base64');
+}
+
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('access_token');
 
@@ -20,7 +16,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  const nonce = generateNonce();
+  const csp = [
+    `default-src 'self'`,
+    `script-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'unsafe-inline'`,
+    `img-src 'self' data: blob:`,
+    `connect-src 'self'`,
+    `font-src 'self'`,
+    `frame-ancestors 'none'`,
+  ].join('; ');
+
+  const response = NextResponse.next();
+  response.headers.set('Content-Security-Policy-Report-Only', csp);
+  return response;
 }
 
 export const config = {
