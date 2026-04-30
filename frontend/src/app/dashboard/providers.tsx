@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback } from 'react';
+import { Suspense } from 'react';
 import { SidebarProvider } from '@/src/contexts/SidebarContext';
 import { ProtectedRoute } from '@/src/components/auth/ProtectedRoute';
 import { Sidebar } from '@/src/components/layout/sidebar';
@@ -30,7 +30,7 @@ function DashboardLayoutFallback() {
 function EmailStatusListener() {
   const { toast } = useToast();
 
-  const handleEmailStatus = useCallback((event: EmailStatusEvent) => {
+  const handleEmailStatus = (event: EmailStatusEvent) => {
     const title = EMAIL_STATUS_LABELS[event.type] ?? 'E-mail';
     if (event.status === 'sent') {
       toast({
@@ -44,14 +44,14 @@ function EmailStatusListener() {
         variant: 'destructive',
       });
     }
-  }, [toast]);
+  };
 
-  const handleMessage = useCallback((event: SseMessageEvent) => {
+  const handleMessage = (event: SseMessageEvent) => {
     toast({
       title: event.type ?? 'Aviso do sistema',
       description: event.content,
     });
-  }, [toast]);
+  };
 
   useEmailStatusSse(handleEmailStatus, handleMessage);
 
